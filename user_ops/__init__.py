@@ -41,9 +41,8 @@ flex_pool_grad = _flex_pooling_op_so.flex_pool_grad
 flex_deconv = _flex_deconvolution_op_so.flex_deconv
 flex_deconv_grad = _flex_deconvolution_op_so.flex_deconv_grad
 
+
 # pylint: disable=redefined-builtin
-
-
 def flex_convolution(features,
                      position,
                      neighborhood,

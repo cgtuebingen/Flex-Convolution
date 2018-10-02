@@ -10,7 +10,7 @@ project( FlexConv )
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR})
 
-find_package(CUDA 9 REQUIRED)
+find_package(CUDA REQUIRED)
 find_package(TensorFlow REQUIRED)
 
 

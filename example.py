@@ -19,29 +19,50 @@
 
 
 """
-Demonstration of using FlexConvolution Layer.
+Demonstration of using FlexConvolution, FlexPooling Layer.
 """
 
 import numpy as np
 import tensorflow as tf
-from layers import flex_convolution
+from tabulate import tabulate
+from layers import flex_convolution, flex_convolution_transpose, flex_pooling
 
-B, Din, Dout, Dp, N, K = 1, 2, 4, 3, 10, 5
+B, Din, Dout, Dout2, Dp, N, N2, K, K2 = 1, 2, 4, 8, 3, 10, 5, 5, 3
 
 features = np.random.randn(B, Din, N).astype(np.float32)
 positions = np.random.randn(B, Dp, N).astype(np.float32)
 neighbors = np.random.randint(0, N, [B, K, N]).astype(np.int32)
+neighbors2 = np.random.randint(0, N, [B, K2, N2]).astype(np.int32)
 
-features = tf.convert_to_tensor(features)
-positions = tf.convert_to_tensor(positions)
-neighbors = tf.convert_to_tensor(neighbors)
+features = tf.convert_to_tensor(features, name='features')
+positions = tf.convert_to_tensor(positions, name='positions')
+neighbors = tf.convert_to_tensor(neighbors, name='neighbors')
+neighbors2 = tf.convert_to_tensor(neighbors2, name='neighbors2')
 
-features2 = flex_convolution(features, positions, neighbors, Dout)
-features3 = flex_convolution(features2, positions, neighbors, Dout, trainable=False)
+net = [features]
+# use our FlexConv similar to a traditional convolution layer
+net.append(flex_convolution(net[-1], positions, neighbors, Dout))
+# pool and sub-sampling are different operations
+net.append(flex_pooling(net[-1], neighbors))
+
+# when ordering the points beforehand sub-sampling is simply
+features = net[-1][:, :, :N2]
+positions = positions[:, :, :N2]
+
+net.append(features)
+# we didn't notice any improvements using the transposed version vs. pooling
+net.append(flex_convolution_transpose(net[-1], positions, neighbors2, Dout2))
+# of course any commonly used arguments work here as well
+net.append(flex_convolution(net[-1], positions,
+                            neighbors2, Dout2, trainable=False))
+
+
 
 with tf.Session() as sess:
   sess.run(tf.global_variables_initializer())
-  sess.run(features2)
-  sess.run(features3)
+  sess.run(net[-1])
 
-  print(tf.trainable_variables())
+  print(tabulate([[v.name, v.shape] for v in tf.trainable_variables()],
+                 headers=["Name", "Shape"]))
+
+  print(tabulate([[n.name, n.shape] for n in net], headers=["Name", "Shape"]))

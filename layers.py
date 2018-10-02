@@ -29,18 +29,88 @@ from tensorflow.python.util.tf_export import tf_export
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.framework import ops
 
-flex_pooling = _flex_pooling
-flex_convolution_transpose = _flex_convolution_transpose
+
+all = ['FlexPooling', 'FlexConvolution', 'FlexConvolutionTranspose',
+       'flex_pooling', 'flex_convolution', 'flex_convolution_transpose']
 
 
-def _remove_dim(x, axis):
-  shape = x.shape.as_list()
-  assert shape[axis] == 1
-  del shape[axis]
-  return tf.reshape(x, shape)
+def _remove_dim(x, axis=2):
+  return tf.squeeze(x, axis=axis)
 
 
-@tf_export('keras.layers.Dense')
+@tf_export('keras.layers.FlexPooling')
+class FlexPooling(Layer):
+  """flex pooling layer.
+
+  This layer performs a max-pooling operation over elements in arbitrary
+  neighborhoods. When `data_format` is 'simple', the input shape should
+  have rank 3, otherwise rank 4 and dimension 2 should be 1.
+
+  Remarks:
+      In contrast to traditional pooling, this operation has no option for
+      sub-sampling.
+
+  Arguments:
+      features: A `Tensor` of the format [B, Din, (1), N].
+      neighborhoods: A `Tensor` of the format [B, K, (1), N] (tf.int32).
+      name: A string, the name of the layer.
+
+  """
+
+  def __init__(self,
+               features,
+               neighborhoods,
+               data_format='simple',
+               name=None):
+
+    super(FlexPooling, self).__init__(name=name)
+    self.features = features
+    self.neighborhoods = neighborhoods
+    self.data_format = data_format
+
+  def compute_output_shape(self, input_shape):
+    return tensor_shape.TensorShape(input_shape)
+
+  def build(self, input_shape):
+    self.built = True
+
+  def call(self, inputs):
+    if not isinstance(inputs, list):
+      raise ValueError('A flexconv layer should be called '
+                       'on a list of inputs.')
+
+    features = ops.convert_to_tensor(inputs[0], dtype=self.dtype)
+    neighborhoods = ops.convert_to_tensor(inputs[1], dtype=tf.int32)
+
+    if self.data_format == 'expanded':
+      features = _remove_dim(inputs[0], 2)
+      neighborhoods = _remove_dim(inputs[1], 2)
+    else:
+      features = inputs[0]
+      neighborhoods = inputs[1]
+
+    y, _ = _flex_pooling(features, neighborhoods)
+
+    if self.data_format == 'expanded':
+      y = tf.expand_dims(y, axis=2)
+
+    return y
+
+
+def flex_pooling(features,
+                 neighborhoods,
+                 data_format='simple',
+                 name=None):
+
+  layer = FlexPooling(features,
+                      neighborhoods,
+                      data_format=data_format,
+                      name=name)
+
+  return layer.apply([features, neighborhoods])
+
+
+@tf_export('keras.layers.FlexConvolution')
 class FlexConvolution(Layer):
   """flex convolution layer.
 
@@ -49,6 +119,8 @@ class FlexConvolution(Layer):
   If `use_feature_bias` is True (and a `features_bias_initializer` is provided),
   a bias vector is created and added to the outputs after te convolution.
   Finally, if `activation` is not `None`, it is applied to the outputs as well.
+  When `data_format` is 'simple', the input shape should have rank 3,
+  otherwise rank 4 and dimension 2 should be 1.
 
   Remarks:
       In contrast to traditional convolutions, this operation has two
@@ -120,7 +192,6 @@ class FlexConvolution(Layer):
     else:
       features = self.features
       positions = self.positions
-
     [B, Din, N] = features.shape
     Din = int(Din)
     N = int(N)
@@ -211,5 +282,110 @@ def flex_convolution(features,
                           data_format=data_format,
                           trainable=trainable,
                           name=name)
+
+  return layer.apply([features, positions, neighborhoods])
+
+
+@tf_export('keras.layers.FlexConvolutionTranspose')
+class FlexConvolutionTranspose(FlexConvolution):
+  """flex convolution-transpose layer.
+
+  This layer applies a transpose convolution to elements in arbitrary
+  neighborhoods.
+  If `use_feature_bias` is True (and a `features_bias_initializer` is provided),
+  a bias vector is created and added to the outputs after te convolution.
+  Finally, if `activation` is not `None`, it is applied to the outputs as well.
+  When `data_format` is 'simple', the input shape should have rank 3,
+  otherwise rank 4 and dimension 2 should be 1.
+
+  Remarks:
+      In contrast to traditional transposed convolutions, this operation has two
+      bias terms:
+        - bias term when dynamically computing the weight [Din, Dout]
+        - bias term which is added tot the features [Dout]
+
+  Arguments:
+      features: A `Tensor` of the format [B, Din, (1), N].
+      positions: A `Tensor` of the format [B, Dp, (1), N].
+      neighborhoods: A `Tensor` of the format [B, K, (1), N] (tf.int32).
+      filters: Integer, the dimensionality of the output space (i.e. the number
+        of filters in the convolution).
+      activation: Activation function. Set it to None to maintain a
+        linear activation.
+      kernel_initializer: An initializer for the convolution kernel.
+      position_bias_initializer: An initializer for the bias vector within
+        the convolution. If None, the default initializer will be used.
+      features_bias_initializer: An initializer for the bias vector after
+        the convolution. If None, the default initializer will be used.
+      use_feature_bias: Boolean, whether the layer uses a bias.
+      data_format: A string, one of `simple` (default) or `expaned`.
+        If `simple` the shapes are [B, Din, N], when `expanded` the shapes
+        are assumed to be [B, Din, 1, N] to match `channels_first` in trad
+        convolutions.
+      trainable: Boolean, if `True` also add variables to the graph collection
+        `GraphKeys.TRAINABLE_VARIABLES` (see `tf.Variable`).
+      name: A string, the name of the layer.
+
+  """
+
+  def call(self, inputs):
+
+    if not isinstance(inputs, list):
+      raise ValueError('A flexconv layer should be called '
+                       'on a list of inputs.')
+
+    features = ops.convert_to_tensor(inputs[0], dtype=self.dtype)
+    positions = ops.convert_to_tensor(inputs[1], dtype=self.dtype)
+    neighborhoods = ops.convert_to_tensor(inputs[2], dtype=tf.int32)
+
+    if self.data_format == 'expanded':
+      features = _remove_dim(inputs[0], 2)
+      positions = _remove_dim(inputs[1], 2)
+      neighborhoods = _remove_dim(inputs[2], 2)
+    else:
+      features = inputs[0]
+      positions = inputs[1]
+      neighborhoods = inputs[2]
+
+    y = _flex_convolution_transpose(features, positions, neighborhoods,
+                                    self.position_theta, self.position_bias)
+
+    if self.use_feature_bias:
+      y = tf.add(y, self.feature_bias)
+
+    if self.activation is not None:
+      y = self.activation(y)
+
+    if self.data_format == 'expanded':
+      y = tf.expand_dims(y, axis=2)
+
+    return y
+
+
+def flex_convolution_transpose(features,
+                               positions,
+                               neighborhoods,
+                               filters,
+                               activation=None,
+                               kernel_initializer=None,
+                               position_bias_initializer=tf.zeros_initializer(),
+                               features_bias_initializer=tf.zeros_initializer(),
+                               use_feature_bias=True,
+                               data_format='simple',
+                               trainable=True,
+                               name=None):
+
+  layer = FlexConvolutionTranspose(features,
+                                   positions,
+                                   neighborhoods,
+                                   filters,
+                                   activation=activation,
+                                   kernel_initializer=kernel_initializer,
+                                   position_bias_initializer=position_bias_initializer,
+                                   features_bias_initializer=features_bias_initializer,
+                                   use_feature_bias=use_feature_bias,
+                                   data_format=data_format,
+                                   trainable=trainable,
+                                   name=name)
 
   return layer.apply([features, positions, neighborhoods])
