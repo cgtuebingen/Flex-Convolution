@@ -41,7 +41,8 @@ neighbors2 = tf.convert_to_tensor(neighbors2, name='neighbors2')
 
 net = [features]
 # use our FlexConv similar to a traditional convolution layer
-net.append(flex_convolution(net[-1], positions, neighbors, Dout))
+net.append(flex_convolution(net[-1], positions, neighbors, Dout,
+                            activation=tf.nn.relu))
 # pool and sub-sampling are different operations
 net.append(flex_pooling(net[-1], neighbors))
 
@@ -51,16 +52,22 @@ positions = positions[:, :, :N2]
 
 net.append(features)
 # we didn't notice any improvements using the transposed version vs. pooling
-net.append(flex_convolution_transpose(net[-1], positions, neighbors2, Dout2))
+net.append(flex_convolution_transpose(net[-1], positions, neighbors2, Dout2,
+                                      activation=tf.nn.relu))
 # of course any commonly used arguments work here as well
 net.append(flex_convolution(net[-1], positions,
-                            neighbors2, Dout2, trainable=False))
+                            neighbors2, Dout2,
+                            trainable=False, activation=tf.nn.relu))
 
-
+gradient_wrt_feature = tf.gradients(net[-1], net[0])
 
 with tf.Session() as sess:
   sess.run(tf.global_variables_initializer())
-  sess.run(net[-1])
+  ouputs = sess.run(net[-1])
+  grads = sess.run(gradient_wrt_feature)
+
+  assert not np.isnan(ouputs).any()
+  assert not np.isnan(grads).any()
 
   print(tabulate([[v.name, v.shape] for v in tf.trainable_variables()],
                  headers=["Name", "Shape"]))
