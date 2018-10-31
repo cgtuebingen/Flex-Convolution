@@ -18,70 +18,85 @@
 # Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
 
 
-from PointTestCase import PointTestCase
+from misc import FakePointCloud, VerboseTestCase
 import tensorflow as tf
 import numpy as np
 
 from __init__ import flex_pooling
 
+case = FakePointCloud(B=2, N=32, K=4, Din=2, Dout=6, Dp=3)
 
-class FlexPoolTest(PointTestCase):
-    def __init__(self, methodName="runTest"):
-        super(FlexPoolTest, self).__init__(methodName)
 
-    def _forward(self, use_gpu=False):
-        self.init_ops()
-        with self.test_session(use_gpu=use_gpu, force_gpu=use_gpu) as sess:
-            actual_op, winner_op = flex_pooling(self.features_op, self.neighborhood_op)
-            actual = sess.run(actual_op)
-        return actual
+class FlexPoolTest(VerboseTestCase):
+  def __init__(self, methodName="runTest"):
+    super(FlexPoolTest, self).__init__(methodName)
 
-    def test_forward(self):
-        cpu = self._forward(use_gpu=False)
-        gpu = self._forward(use_gpu=True)
-        self.assertAllClose(cpu, gpu)
+  def _forward(self, use_gpu=False, dtype=np.float32):
+    case.init_ops(dtype=dtype)
+    with self.test_session(use_gpu=use_gpu, force_gpu=use_gpu) as sess:
+      actual_op, winner_op = flex_pooling(
+          case.features_op, case.neighborhood_op)
+      actual = sess.run(actual_op)
+    return actual
 
-    def test_backward(self):
-        cpu, winner_cpu = self._backward(use_gpu=False)
-        gpu, winner_gpu = self._backward(use_gpu=True)
-        self.assertAllClose(cpu, gpu)
-        self.assertAllClose(cpu[winner_cpu == 0].sum(), 0)
-        self.assertAllClose(gpu[winner_gpu == 0].sum(), 0)
+  def test_forward_same_float32(self):
+    cpu = self._forward(use_gpu=False, dtype=np.float32)
+    gpu = self._forward(use_gpu=True, dtype=np.float32)
+    self.assertAllClose(cpu, gpu)
 
-    def _backward(self, use_gpu=False):
-        self.init_ops()
-        with self.test_session(use_gpu=use_gpu, force_gpu=use_gpu) as sess:
-            actual_op, winner_op = flex_pooling(
-                self.features_op,
-                self.neighborhood_op)
+  def test_forward_same_float64(self):
+    cpu = self._forward(use_gpu=False, dtype=np.float64)
+    gpu = self._forward(use_gpu=True, dtype=np.float64)
+    self.assertAllClose(cpu, gpu)
 
-            graph_features_grad = tf.gradients(actual_op, [self.features_op])[0]
+  def test_backward_same_float32(self):
+    cpu, winner_cpu = self._backward(use_gpu=False, dtype=np.float32)
+    gpu, winner_gpu = self._backward(use_gpu=True, dtype=np.float32)
+    self.assertAllClose(winner_cpu, winner_gpu)
+    self.assertAllClose(cpu, gpu)
 
-            dx, winner = sess.run([graph_features_grad, winner_op])
-            return dx, winner
+  def test_backward_same_float64(self):
+    cpu, winner_cpu = self._backward(use_gpu=False, dtype=np.float64)
+    gpu, winner_gpu = self._backward(use_gpu=True, dtype=np.float64)
+    self.assertAllClose(winner_cpu, winner_gpu)
+    self.assertAllClose(cpu, gpu)
 
-    def _simple_backward(self, use_gpu=False):
-        # BN
-        x = np.array([[[1], [2], [5], [3]]]).transpose(0, 2, 1)
-        n = np.array([[[0, 1, 2, 3], [1, 2, 3, 0], [2, 3, 0, 1], [3, 0, 1, 2, ]]]).transpose(0, 2, 1)
+  def _backward(self, use_gpu=False, dtype=np.float32):
+    case.init_ops(dtype=dtype)
+    with self.test_session(use_gpu=use_gpu, force_gpu=use_gpu) as sess:
+      actual_op, winner_op = flex_pooling(
+          case.features_op,
+          case.neighborhood_op)
 
-        x = tf.convert_to_tensor(x.astype(np.float32))
-        n = tf.convert_to_tensor(n.astype(np.int32))
+      graph_features_grad = tf.gradients(actual_op, [case.features_op])[0]
 
-        with self.test_session(use_gpu=use_gpu, force_gpu=use_gpu) as sess:
-            actual_op, winner_op = flex_pooling(x, n)
-            graph_features_grad = tf.gradients(actual_op, [x])[0]
-            return sess.run(graph_features_grad)
+      dx, winner = sess.run([graph_features_grad, winner_op])
+      return dx, winner
 
-    def test_backward_simple(self):
-        cpu = self._simple_backward(use_gpu=False)
-        cpu[0, 0, 2] -= 4
-        self.assertEqual(cpu.sum(), 0)
+  def _simple_backward(self, use_gpu=False):
+    # BN
+    x = np.array([[[1], [2], [5], [3]]]).transpose(0, 2, 1)
+    n = np.array([[[0, 1, 2, 3], [1, 2, 3, 0], [2, 3, 0, 1],
+                   [3, 0, 1, 2, ]]]).transpose(0, 2, 1)
 
-        gpu = self._simple_backward(use_gpu=True)
-        gpu[0, 0, 2] -= 4
-        self.assertEqual(gpu.sum(), 0)
+    x = tf.convert_to_tensor(x.astype(np.float32))
+    n = tf.convert_to_tensor(n.astype(np.int32))
+
+    with self.test_session(use_gpu=use_gpu, force_gpu=use_gpu) as sess:
+      actual_op, winner_op = flex_pooling(x, n)
+      graph_features_grad = tf.gradients(actual_op, [x])[0]
+      return sess.run(graph_features_grad)
+
+  def test_backward_simple_cpu(self):
+    cpu = self._simple_backward(use_gpu=False)
+    cpu[0, 0, 2] -= 4
+    self.assertEqual(cpu.sum(), 0)
+
+  def test_backward_simple_gpu(self):
+    gpu = self._simple_backward(use_gpu=True)
+    gpu[0, 0, 2] -= 4
+    self.assertEqual(gpu.sum(), 0)
 
 
 if __name__ == '__main__':
-    tf.test.main()
+  tf.test.main()

@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-//Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
+// Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
 
 #include "flex_conv_op.h"
 
@@ -91,32 +91,22 @@ class FlexConvGradOp : public OpKernel {
   }
 };
 
-// Register the CPU kernels.
-#define REGISTER_FLEXCONV_OP_CPU(T)                                   \
-  REGISTER_KERNEL_BUILDER(                                            \
-      Name("FlexConv").Device(DEVICE_CPU).TypeConstraint<T>("T"),     \
-      FlexConvOp<CPUDevice, T>)                                       \
-  REGISTER_KERNEL_BUILDER(                                            \
-      Name("FlexConvGrad").Device(DEVICE_CPU).TypeConstraint<T>("T"), \
-      FlexConvGradOp<CPUDevice, T>)
+#define REGISTER_CUSTOM_OP(NAME, DEVICE, T)                       \
+  REGISTER_KERNEL_BUILDER(                                        \
+      Name(#NAME).Device(DEVICE_##DEVICE).TypeConstraint<T>("T"), \
+      NAME##Op<DEVICE##Device, T>)
 
-TF_CALL_float(REGISTER_FLEXCONV_OP_CPU);
-#undef REGISTER_FLEXCONV_OP_CPU
+REGISTER_CUSTOM_OP(FlexConv, CPU, float);
+REGISTER_CUSTOM_OP(FlexConvGrad, CPU, float);
+REGISTER_CUSTOM_OP(FlexConv, CPU, double);
+REGISTER_CUSTOM_OP(FlexConvGrad, CPU, double);
 
-// Register the GPU kernels.
-// #ifdef GOOGLE_CUDA
-
-#define REGISTER_FLEXCONV_OP_GPU(T)                                   \
-  REGISTER_KERNEL_BUILDER(                                            \
-      Name("FlexConv").Device(DEVICE_GPU).TypeConstraint<T>("T"),     \
-      FlexConvOp<GPUDevice, T>)                                       \
-  REGISTER_KERNEL_BUILDER(                                            \
-      Name("FlexConvGrad").Device(DEVICE_GPU).TypeConstraint<T>("T"), \
-      FlexConvGradOp<GPUDevice, T>)
-
-TF_CALL_float(REGISTER_FLEXCONV_OP_GPU);
-#undef REGISTER_FLEXCONV_OP_GPU
-
-// #endif  // GOOGLE_CUDA
+#ifdef GOOGLE_CUDA
+REGISTER_CUSTOM_OP(FlexConv, GPU, float);
+REGISTER_CUSTOM_OP(FlexConvGrad, GPU, float);
+REGISTER_CUSTOM_OP(FlexConv, GPU, double);
+REGISTER_CUSTOM_OP(FlexConvGrad, GPU, double);
+#endif  // GOOGLE_CUDA
+#undef REGISTER_CUSTOM_OP
 
 }  // namespace tensorflow

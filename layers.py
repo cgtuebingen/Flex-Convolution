@@ -20,25 +20,86 @@
 import tensorflow as tf
 from user_ops import flex_convolution as _flex_convolution
 from user_ops import flex_pooling as _flex_pooling
+from user_ops import knn_bruteforce as _knn_bruteforce
 from user_ops import flex_convolution_transpose as _flex_convolution_transpose
 
 from tensorflow.python.keras import activations
 from tensorflow.python.keras import initializers
 from tensorflow.python.layers.base import Layer
-from tensorflow.python.util.tf_export import tf_export
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.framework import ops
 
 
 all = ['FlexPooling', 'FlexConvolution', 'FlexConvolutionTranspose',
-       'flex_pooling', 'flex_convolution', 'flex_convolution_transpose']
+       'flex_pooling', 'flex_convolution', 'flex_convolution_transpose',
+       'knn_bruteforce', 'KnnBruteforce']
 
 
 def _remove_dim(x, axis=2):
   return tf.squeeze(x, axis=axis)
 
 
-@tf_export('keras.layers.FlexPooling')
+class KnnBruteforce(Layer):
+  """knn bruteforce layer.
+  This layer performs a nearest neighbor lookup for a batch of given positions.
+
+  Arguments:
+      K: size of each neighborhood
+      data_format: A string, one of `simple` (default) or `expanded`.
+        If `simple` the shapes are [B, Din, N], when `expanded` the shapes
+        are assumed to be [B, Din, 1, N] to match `channels_first` in trad
+        convolutions.
+      name: A string, the name of the layer.
+
+  Inputs:
+      positions: A `Tensor` of the format [B, Dp, (1), N].
+
+  Outputs:
+      neighborhoods: A `Tensor` of the format [B, K, (1), N] (tf.int32).
+
+  """
+
+  def __init__(self,
+               K,
+               data_format='simple',
+               name=None):
+
+    super(KnnBruteforce, self).__init__(name=name)
+    assert K > 0
+    assert data_format in ['simple', 'expanded']
+    self.K = K
+    self.data_format = data_format
+
+  def compute_output_shape(self, input_shapes):
+    output_shape = input_shapes[0]
+    output_shape[1] = self.K
+    return output_shape
+
+  def call(self, inputs):
+
+    positions = ops.convert_to_tensor(inputs, dtype=self.dtype)
+    if self.data_format == 'expanded':
+      positions = _remove_dim(positions, 2)
+
+    NN, _, _ = _knn_bruteforce(positions, K=4)
+    NN = tf.transpose(NN, [0, 2, 1])
+
+    if self.data_format == 'expanded':
+      NN = tf.expand_dims(NN, axis=2)
+
+    return NN
+
+
+def knn_bruteforce(positions,
+                   K,
+                   data_format='simple',
+                   name=None):
+
+  layer = KnnBruteforce(K, data_format=data_format, name=name)
+
+  return layer.apply(positions)
+
+
 class FlexPooling(Layer):
   """flex pooling layer.
 
@@ -53,7 +114,18 @@ class FlexPooling(Layer):
   Arguments:
       features: A `Tensor` of the format [B, Din, (1), N].
       neighborhoods: A `Tensor` of the format [B, K, (1), N] (tf.int32).
+      data_format: A string, one of `simple` (default) or `expanded`.
+        If `simple` the shapes are [B, Din, N], when `expanded` the shapes
+        are assumed to be [B, Din, 1, N] to match `channels_first` in trad
+        convolutions.
       name: A string, the name of the layer.
+
+  Inputs:
+      features: A `Tensor` of the format[B, Din, (1), N].
+      neighborhoods: A `Tensor` of the format [B, K, (1), N] (tf.int32).
+
+  Outputs:
+      features: A `Tensor` of the format[B, Din, (1), N].
 
   """
 
@@ -62,6 +134,7 @@ class FlexPooling(Layer):
                name=None):
 
     super(FlexPooling, self).__init__(name=name)
+    assert data_format in ['simple', 'expanded']
     self.data_format = data_format
 
   def compute_output_shape(self, input_shape):
@@ -93,11 +166,9 @@ def flex_pooling(features,
                  name=None):
 
   layer = FlexPooling(data_format=data_format, name=name)
-
   return layer.apply([features, neighborhoods])
 
 
-@tf_export('keras.layers.FlexConvolution')
 class FlexConvolution(Layer):
   """flex convolution layer.
 
@@ -126,7 +197,7 @@ class FlexConvolution(Layer):
       features_bias_initializer: An initializer for the bias vector after
         the convolution. If None, the default initializer will be used.
       use_feature_bias: Boolean, whether the layer uses a bias.
-      data_format: A string, one of `simple` (default) or `expaned`.
+      data_format: A string, one of `simple` (default) or `expanded`.
         If `simple` the shapes are [B, Din, N], when `expanded` the shapes
         are assumed to be [B, Din, 1, N] to match `channels_first` in trad
         convolutions.
@@ -136,9 +207,11 @@ class FlexConvolution(Layer):
 
   Inputs:
       features: A `Tensor` of the format[B, Din, (1), N].
-  positions: A `Tensor` of the format[B, Dp, (1), N].
-  neigh
-borhoods: A `Tensor` of the format [B, K, (1), N] (tf.int32).
+      positions: A `Tensor` of the format[B, Dp, (1), N].
+      neighborhoods: A `Tensor` of the format [B, K, (1), N] (tf.int32).
+
+  Outputs:
+      features: A `Tensor` of the format[B, Dout, (1), N].
 
   """
 
@@ -155,6 +228,7 @@ borhoods: A `Tensor` of the format [B, K, (1), N] (tf.int32).
 
     super(FlexConvolution, self).__init__(trainable=trainable,
                                           name=name)
+    assert data_format in ['simple', 'expanded']
     self.filters = int(filters)
     self.activation = activations.get(activation)
     self.use_feature_bias = use_feature_bias
@@ -226,7 +300,7 @@ borhoods: A `Tensor` of the format [B, K, (1), N] (tf.int32).
 
     Returns:
         tf.tensor: A `Tensor` of the format [B, Dout, (1), N] describing
-        the outgoing features.
+          the outgoing features.
 
     """
     if not isinstance(inputs, list):
@@ -283,7 +357,6 @@ def flex_convolution(features,
   return layer.apply([features, positions, neighborhoods])
 
 
-@tf_export('keras.layers.FlexConvolutionTranspose')
 class FlexConvolutionTranspose(FlexConvolution):
   """flex convolution-transpose layer.
 
@@ -312,7 +385,7 @@ class FlexConvolutionTranspose(FlexConvolution):
       features_bias_initializer: An initializer for the bias vector after
         the convolution. If None, the default initializer will be used.
       use_feature_bias: Boolean, whether the layer uses a bias.
-      data_format: A string, one of `simple` (default) or `expaned`.
+      data_format: A string, one of `simple` (default) or `expanded`.
         If `simple` the shapes are [B, Din, N], when `expanded` the shapes
         are assumed to be [B, Din, 1, N] to match `channels_first` in trad
         convolutions.
@@ -324,6 +397,9 @@ class FlexConvolutionTranspose(FlexConvolution):
       features: A `Tensor` of the format [B, Din, (1), N].
       positions: A `Tensor` of the format [B, Dp, (1), N].
       neighborhoods: A `Tensor` of the format [B, K, (1), N] (tf.int32).
+
+  Outputs:
+      features: A `Tensor` of the format[B, Dout, (1), N].
 
   """
 

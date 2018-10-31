@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-//Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
+// Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
 
 #include "flex_deconv_op.h"
 
@@ -88,16 +88,22 @@ class FlexDeconvGradOp : public OpKernel {
   }
 };
 
-#define OPNAME(NAME) NAME##Op
-#define REGISTER(NAME, Dtype)                                    \
-  REGISTER_KERNEL_BUILDER(                                       \
-      Name(#NAME).Device(DEVICE_CPU).TypeConstraint<Dtype>("T"), \
-      OPNAME(NAME) < CPUDevice, Dtype >);                        \
-  REGISTER_KERNEL_BUILDER(                                       \
-      Name(#NAME).Device(DEVICE_GPU).TypeConstraint<Dtype>("T"), \
-      OPNAME(NAME) < GPUDevice, Dtype >);
+#define REGISTER_CUSTOM_OP(NAME, DEVICE, T)                       \
+  REGISTER_KERNEL_BUILDER(                                        \
+      Name(#NAME).Device(DEVICE_##DEVICE).TypeConstraint<T>("T"), \
+      NAME##Op<DEVICE##Device, T>)
 
-REGISTER(FlexDeconv, float);
-REGISTER(FlexDeconvGrad, float);
+REGISTER_CUSTOM_OP(FlexDeconv, CPU, float);
+REGISTER_CUSTOM_OP(FlexDeconvGrad, CPU, float);
+REGISTER_CUSTOM_OP(FlexDeconv, CPU, double);
+REGISTER_CUSTOM_OP(FlexDeconvGrad, CPU, double);
+
+#ifdef GOOGLE_CUDA
+REGISTER_CUSTOM_OP(FlexDeconv, GPU, float);
+REGISTER_CUSTOM_OP(FlexDeconvGrad, GPU, float);
+REGISTER_CUSTOM_OP(FlexDeconv, GPU, double);
+REGISTER_CUSTOM_OP(FlexDeconvGrad, GPU, double);
+#endif  // GOOGLE_CUDA
+#undef REGISTER_CUSTOM_OP
 
 }  // namespace tensorflow

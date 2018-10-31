@@ -13,7 +13,12 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR})
 find_package(CUDA REQUIRED)
 find_package(TensorFlow REQUIRED)
 
+# include CUDA Toolkit header files
+set(CUDA_SAMPLE_INC "$ENV{CUDA_INSTALL_PATH}/samples/common/inc")
+message(STATUS "CUDA_INCLUDE_DIRS: ${CUDA_INCLUDE_DIRS}")
+message(STATUS "CUDA_SAMPLE_INC: ${CUDA_SAMPLE_INC}")
 
+# include CUBS
 if (DEFINED ENV{CUB_INC})
     message(STATUS "Use Cuda-CUB from " $ENV{CUB_INC})
     set(CUB_INC $ENV{CUB_INC})
@@ -31,6 +36,8 @@ include_directories(SYSTEM "/usr/local/")
 # fix cgtuebingen
 include_directories(SYSTEM "/graphics/opt/opt_Ubuntu18.04/cuda/toolkit_9.2")
 
+include_directories(SYSTEM "${CUDA_SAMPLE_INC}")
+include_directories(SYSTEM "${CUDA_INCLUDE_DIRS}/../../")
 include_directories(SYSTEM ${CUB_INC})
 include_directories(SYSTEM ${TensorFlow_INCLUDE_DIR})
 include_directories(SYSTEM kernels)
@@ -38,3 +45,4 @@ include_directories(SYSTEM kernels)
 add_tensorflow_gpu_operation("flex_conv")
 add_tensorflow_gpu_operation("flex_deconv")
 add_tensorflow_gpu_operation("flex_pool")
+add_tensorflow_gpu_operation("knn_bruteforce")

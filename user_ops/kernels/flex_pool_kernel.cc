@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-//Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
+// Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
 
 #include "flex_pool_op.h"
 #include "tensorflow/core/framework/op.h"
@@ -59,6 +59,7 @@ struct FlexPoolFunctor<CPUDevice, Dtype> {
 };
 
 template struct FlexPoolFunctor<CPUDevice, float>;
+template struct FlexPoolFunctor<CPUDevice, double>;
 
 template <typename Dtype>
 struct FlexPoolGrad<CPUDevice, Dtype> {
@@ -94,9 +95,8 @@ struct FlexPoolGrad<CPUDevice, Dtype> {
   }
 };
 
-// template struct FlexPoolGrad<CPUDevice, int>;
 template struct FlexPoolGrad<CPUDevice, float>;
-// template struct FlexPoolGrad<CPUDevice, double>;
+template struct FlexPoolGrad<CPUDevice, double>;
 
 }  // namespace functor
 }  // namespace tensorflow

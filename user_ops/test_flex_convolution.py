@@ -18,91 +18,119 @@
 # Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
 
 
-from PointTestCase import TPC, PointTestCase, summary
+from misc import FakePointCloud, VerboseTestCase
 import tensorflow as tf
-
+import numpy as np
 from __init__ import flex_convolution
 
+case = FakePointCloud(B=2, N=32, K=4, Din=2, Dout=6, Dp=3)
 
-class FlexConvTest(PointTestCase):
+
+class FlexConvTest(VerboseTestCase):
   def __init__(self, methodName="runTest"):
     super(FlexConvTest, self).__init__(methodName)
 
-  def _forward(self, use_gpu=False, force_gpu=False):
-    self.init_ops()
+  def _forward(self, use_gpu=False, force_gpu=False, dtype=np.float32):
+    case.init_ops(dtype=dtype)
     with self.test_session(use_gpu=use_gpu, force_gpu=use_gpu) as sess:
-      actual_op = flex_convolution(self.features_op,
-                                   self.position_op, self.neighborhood_op,
-                                   self.theta_op, self.bias_op)
+      actual_op = flex_convolution(case.features_op,
+                                   case.position_op, case.neighborhood_op,
+                                   case.theta_op, case.bias_op)
       actual = sess.run(actual_op)
     return actual
 
-  def test_forward(self):
+  def test_forward(self, dtype=np.float32):
     cpu = self._forward(use_gpu=False)
     gpu = self._forward(use_gpu=True)
-    self.assertAllClose(cpu, gpu, 1e-5, 1e-5)
+    self.assertAllClose(cpu, gpu, 1e-4)
 
-  def _backward_features(self, use_gpu=False):
-    self.init_ops()
-    with self.test_session(use_gpu=use_gpu, force_gpu=use_gpu):
-      actual_op = flex_convolution(self.features_op,
-                                   self.position_op, self.neighborhood_op,
-                                   self.theta_op, self.bias_op)
-      graph_features_grad, num_features_grad = tf.test.compute_gradient(
-          [self.features_op], [self.features.shape], actual_op,
-          TPC.expected_output_shape())[0]
-      summary(num_features_grad, graph_features_grad, 'self.features')
+  def test_forward_features_gpu_floats(self):
+    cpu32 = self._forward(use_gpu=True, dtype=np.float32)
+    cpu64 = self._forward(use_gpu=True, dtype=np.float64)
+    self.assertAllClose(cpu32, cpu64)
 
-      err = tf.test.compute_gradient_error([self.features_op],
-                                           [self.features.shape],
-                                           actual_op, TPC.expected_output_shape())
-      self.assertLess(err, 1e-2)
+  def _backward_features(self, use_gpu=False, dtype=np.float32, numdiff=True):
+    case.init_ops(dtype=dtype)
+    with self.test_session(use_gpu=use_gpu, force_gpu=use_gpu) as sess:
+      actual_op = flex_convolution(case.features_op,
+                                   case.position_op, case.neighborhood_op,
+                                   case.theta_op, case.bias_op)
+      if numdiff:
+        return tf.test.compute_gradient(
+            [case.features_op], [case.features.shape], actual_op,
+            case.expected_output_shape())[0]
+      else:
+        return sess.run(tf.gradients(actual_op, [case.features_op]))[0]
 
-  def _backward_bias(self, use_gpu=False):
-    self.init_ops()
-    with self.test_session(use_gpu=use_gpu, force_gpu=use_gpu):
-      actual_op = flex_convolution(self.features_op,
-                                   self.position_op, self.neighborhood_op,
-                                   self.theta_op, self.bias_op)
+  def _backward_bias(self, use_gpu=False, dtype=np.float32, numdiff=True):
+    case.init_ops(dtype=dtype)
+    with self.test_session(use_gpu=use_gpu, force_gpu=use_gpu) as sess:
+      actual_op = flex_convolution(case.features_op,
+                                   case.position_op, case.neighborhood_op,
+                                   case.theta_op, case.bias_op)
 
-      graph_bias_grad, num_bias_grad = tf.test.compute_gradient(
-          [self.bias_op], [self.bias.shape], actual_op,
-          TPC.expected_output_shape())[0]
-      summary(num_bias_grad, graph_bias_grad, 'self.bias')
+      if numdiff:
+        return tf.test.compute_gradient(
+            [case.bias_op], [case.bias.shape], actual_op,
+            case.expected_output_shape())[0]
+      else:
+        return sess.run(tf.gradients(actual_op, [case.bias_op]))[0]
 
-      err = tf.test.compute_gradient_error([self.bias_op],
-                                           [self.bias.shape], actual_op,
-                                           TPC.expected_output_shape())
-      self.assertLess(err, 1e-2)
+  def _backward_theta(self, use_gpu=False, dtype=np.float32, numdiff=True):
+    case.init_ops(dtype=dtype)
+    with self.test_session(use_gpu=use_gpu, force_gpu=use_gpu) as sess:
+      actual_op = flex_convolution(case.features_op,
+                                   case.position_op, case.neighborhood_op,
+                                   case.theta_op, case.bias_op)
 
-  def _backward_theta(self, use_gpu=False):
-    self.init_ops()
-    with self.test_session(use_gpu=use_gpu, force_gpu=use_gpu):
-      actual_op = flex_convolution(self.features_op,
-                                   self.position_op, self.neighborhood_op,
-                                   self.theta_op, self.bias_op)
+      if numdiff:
+        return tf.test.compute_gradient(
+            [case.theta_op], [case.theta.shape], actual_op,
+            case.expected_output_shape())[0]
+      else:
+        return sess.run(tf.gradients(actual_op, [case.theta_op]))[0]
 
-      graph_theta_grad, num_theta_grad = tf.test.compute_gradient(
-          [self.theta_op], [self.theta.shape], actual_op,
-          TPC.expected_output_shape())[0]
-      summary(num_theta_grad, graph_theta_grad, 'self.theta')
+  def test_backward_features_cpu_float64(self):
+    actual, expected = self._backward_features(use_gpu=False, dtype=np.float64)
+    self.assertAllClose(actual, expected)
 
-      err = tf.test.compute_gradient_error([self.theta_op],
-                                           [self.theta.shape], actual_op,
-                                           TPC.expected_output_shape())
-      self.assertLess(err, 1e-2)
+  def test_backward_bias_cpu_float64(self):
+    actual, expected = self._backward_bias(use_gpu=False, dtype=np.float64)
+    self.assertAllClose(actual, expected)
 
-  def test_backward_features(self):
-    self._backward_features(use_gpu=False)
-    self._backward_features(use_gpu=True)
+  def test_backward_theta_cpu_float64(self):
+    actual, expected = self._backward_theta(use_gpu=False, dtype=np.float64)
+    self.assertAllClose(actual, expected)
 
-  def test_backward_bias(self):
-    self._backward_bias(use_gpu=False)
-    self._backward_bias(use_gpu=True)
+  def test_backward_features_gpu_float64(self):
+    actual, expected = self._backward_features(use_gpu=True, dtype=np.float64)
+    self.assertAllClose(actual, expected)
 
-  def test_backward_theta(self):
-    self._backward_theta(use_gpu=False)
-    self._backward_theta(use_gpu=True)
+  def test_backward_bias_gpu_float64(self):
+    actual, expected = self._backward_bias(use_gpu=True, dtype=np.float64)
+    self.assertAllClose(actual, expected)
+
+  def test_backward_theta_gpu_float64(self):
+    actual, expected = self._backward_theta(use_gpu=True, dtype=np.float64)
+    self.assertAllClose(actual, expected)
+
+  def test_backward_features_gpu_float32(self, dtype=np.float32):
+    cpu = self._backward_features(use_gpu=False, dtype=dtype, numdiff=False)
+    gpu = self._backward_features(use_gpu=True, dtype=dtype, numdiff=False)
+    self.assertAllClose(cpu, gpu)
+
+  def test_backward_bias_gpu_float32(self, dtype=np.float32):
+    cpu = self._backward_bias(use_gpu=False, dtype=dtype, numdiff=False)
+    gpu = self._backward_bias(use_gpu=True, dtype=dtype, numdiff=False)
+    self.assertAllClose(cpu, gpu, 1e-5)
+
+  def test_backward_theta_gpu_float32(self, dtype=np.float32):
+    cpu = self._backward_theta(use_gpu=False, dtype=dtype, numdiff=False)
+    gpu = self._backward_theta(use_gpu=True, dtype=dtype, numdiff=False)
+    self.assertAllClose(cpu, gpu)
+
+
+
 
 
 if __name__ == '__main__':

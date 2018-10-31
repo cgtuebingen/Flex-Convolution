@@ -25,39 +25,51 @@ Demonstration of using FlexConvolution, FlexPooling Layer.
 import numpy as np
 import tensorflow as tf
 from tabulate import tabulate
-from layers import flex_convolution, flex_convolution_transpose, flex_pooling
+from layers import (flex_convolution,
+                    flex_convolution_transpose,
+                    flex_pooling,
+                    knn_bruteforce)
 
-B, Din, Dout, Dout2, Dp, N, N2, K, K2 = 1, 2, 4, 8, 3, 10, 5, 5, 3
+
+B, Din, Dout, Dout2, Dp, N, K = 1, 2, 4, 8, 3, 10, 5
 
 features = np.random.randn(B, Din, N).astype(np.float32)
 positions = np.random.randn(B, Dp, N).astype(np.float32)
-neighbors = np.random.randint(0, N, [B, K, N]).astype(np.int32)
-neighbors2 = np.random.randint(0, N, [B, K2, N2]).astype(np.int32)
 
 features = tf.convert_to_tensor(features, name='features')
 positions = tf.convert_to_tensor(positions, name='positions')
-neighbors = tf.convert_to_tensor(neighbors, name='neighbors')
-neighbors2 = tf.convert_to_tensor(neighbors2, name='neighbors2')
 
 net = [features]
 # use our FlexConv similar to a traditional convolution layer
-net.append(flex_convolution(net[-1], positions, neighbors, Dout,
+
+neighbors = knn_bruteforce(positions, K=5)
+net.append(flex_convolution(net[-1],
+                            positions,
+                            neighbors,
+                            Dout,
                             activation=tf.nn.relu))
 # pool and sub-sampling are different operations
 net.append(flex_pooling(net[-1], neighbors))
 
 # when ordering the points beforehand sub-sampling is simply
-features = net[-1][:, :, :N2]
-positions = positions[:, :, :N2]
-
+features = net[-1][:, :, :N // 2]
+positions = positions[:, :, :N // 2]
 net.append(features)
+
+neighbors = knn_bruteforce(positions, K=3)
 # we didn't notice any improvements using the transposed version vs. pooling
-net.append(flex_convolution_transpose(net[-1], positions, neighbors2, Dout2,
+net.append(flex_convolution_transpose(net[-1],
+                                      positions,
+                                      neighbors,
+                                      Dout,
                                       activation=tf.nn.relu))
 # of course any commonly used arguments work here as well
-net.append(flex_convolution(net[-1], positions,
-                            neighbors2, Dout2,
-                            trainable=False, activation=tf.nn.relu))
+net.append(flex_convolution(net[-1],
+                            positions,
+                            neighbors,
+                            Dout,
+                            activation=tf.nn.relu,
+                            trainable=False))
 
 gradient_wrt_feature = tf.gradients(net[-1], net[0])
 

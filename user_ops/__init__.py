@@ -19,27 +19,38 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+import os
 from tensorflow.python.framework import ops
 from tensorflow.contrib.util import loader
-from tensorflow.python.platform import resource_loader
 
-_flex_convolution_op_so = loader.load_op_library(
-    resource_loader.get_path_to_datafile("flex_conv_op.so"))
-
-_flex_pooling_op_so = loader.load_op_library(
-    resource_loader.get_path_to_datafile("flex_pool_op.so"))
-
-_flex_deconvolution_op_so = loader.load_op_library(
-    resource_loader.get_path_to_datafile("flex_deconv_op.so"))
+__all__ = []
 
 
-# undocumented version
-flex_conv = _flex_convolution_op_so.flex_conv
-flex_conv_grad = _flex_convolution_op_so.flex_conv_grad
-flex_pool = _flex_pooling_op_so.flex_pool
-flex_pool_grad = _flex_pooling_op_so.flex_pool_grad
-flex_deconv = _flex_deconvolution_op_so.flex_deconv
-flex_deconv_grad = _flex_deconvolution_op_so.flex_deconv_grad
+def load_op(name, has_grad=False, public=False):
+  global __all__
+  path = os.path.join(os.path.dirname(__file__), '%s_op.so' % name)
+  if os.path.isfile(path):
+    _module = loader.load_op_library(path)
+    if has_grad:
+      if public:
+        __all__.append('%s' % name)
+        __all__.append('%s_grad' % name)
+      return getattr(_module, '%s' % name), getattr(_module, '%s_grad' % name)
+    else:
+      if public:
+        __all__.append('%s' % name)
+      return getattr(_module, '%s' % name)
+  else:
+    print('[WARNING]: %s does not exists' % name)
+
+knn_bruteforce = load_op('knn_bruteforce', has_grad=False, public=True)
+
+_flex_conv, _flex_conv_grad = load_op(
+    'flex_conv', has_grad=True, public=False)
+_flex_pool, _flex_pool_grad = load_op(
+    'flex_pool', has_grad=True, public=False)
+_flex_deconv, _flex_deconv_grad = load_op(
+    'flex_deconv', has_grad=True, public=False)
 
 
 # pylint: disable=redefined-builtin
@@ -69,7 +80,10 @@ def flex_convolution(features,
   """
 
   with ops.name_scope(name, "flex_convolution"):
-    return flex_conv(features, theta, bias, neighborhood, position)
+    return _flex_conv(features, theta, bias, neighborhood, position)
+
+
+__all__.append('flex_convolution')
 
 
 @ops.RegisterGradient("FlexConv")
@@ -81,7 +95,7 @@ def _FlexConvGrad(op, *grads):  # noqa
   positions = ops.convert_to_tensor(op.inputs[4])
   topdiff = ops.convert_to_tensor(grads[0])
 
-  df, dt, db = flex_conv_grad(
+  df, dt, db = _flex_conv_grad(
       features, theta, bias, neighborhood, positions, topdiff)
 
   df = ops.convert_to_tensor(df, name='gradient_features')
@@ -112,7 +126,10 @@ def flex_pooling(features,
   """
 
   with ops.name_scope(name, "flex_pooling"):
-    return flex_pool(features, neighborhood)
+    return _flex_pool(features, neighborhood)
+
+
+__all__.append('flex_pooling')
 
 
 @ops.RegisterGradient("FlexPool")
@@ -122,7 +139,7 @@ def _FlexPoolGrad(op, *grads):  # noqa
   argmax = ops.convert_to_tensor(op.outputs[1])
   topdiff = ops.convert_to_tensor(grads[0])
 
-  df = flex_pool_grad(features, neighborhood, topdiff, argmax)
+  df = _flex_pool_grad(features, neighborhood, topdiff, argmax)
   df = ops.convert_to_tensor(df, name='gradient_features')
 
   return [df, None]
@@ -153,7 +170,10 @@ def flex_convolution_transpose(features,
   """
 
   with ops.name_scope(name, "flex_convolution_transpose"):
-    return flex_deconv(features, theta, bias, neighborhood, position)
+    return _flex_deconv(features, theta, bias, neighborhood, position)
+
+
+__all__.append('_flex_deconv')
 
 
 @ops.RegisterGradient("FlexDeconv")
@@ -165,7 +185,7 @@ def _FlexDeconvGrad(op, *grads):  # noqa
   positions = ops.convert_to_tensor(op.inputs[4])
   topdiff = ops.convert_to_tensor(grads[0])
 
-  df, dt, db = flex_deconv_grad(
+  df, dt, db = _flex_deconv_grad(
       features, theta, bias, neighborhood, positions, topdiff)
 
   df = ops.convert_to_tensor(df, name='gradient_features')

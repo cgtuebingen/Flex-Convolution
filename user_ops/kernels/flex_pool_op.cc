@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-//Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
+// Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
 
 #include "flex_pool_op.h"
 
@@ -33,7 +33,6 @@ class FlexPoolOp : public OpKernel {
   explicit FlexPoolOp(OpKernelConstruction* ctx) : OpKernel(ctx) {}
 
   void Compute(OpKernelContext* ctx) override {
-    // printf("--> Compute CPU Version <--\n");
     const Tensor& features_ = ctx->input(0);
     const Tensor& neighborhood_ = ctx->input(1);
 
@@ -65,7 +64,6 @@ class FlexPoolGradOp : public OpKernel {
   explicit FlexPoolGradOp(OpKernelConstruction* ctx) : OpKernel(ctx) {}
 
   void Compute(OpKernelContext* ctx) override {
-    // printf("--> Compute CPU Version <--\n");
     const Tensor& features_ = ctx->input(0);
     const Tensor& neighborhood_ = ctx->input(1);
     const Tensor& topdiff_ = ctx->input(2);
@@ -82,32 +80,22 @@ class FlexPoolGradOp : public OpKernel {
   }
 };
 
-// Register the CPU kernels.
-#define REGISTER_FLEXPOOL_OP_CPU(T)                                   \
-  REGISTER_KERNEL_BUILDER(                                            \
-      Name("FlexPool").Device(DEVICE_CPU).TypeConstraint<T>("T"),     \
-      FlexPoolOp<CPUDevice, T>)                                       \
-  REGISTER_KERNEL_BUILDER(                                            \
-      Name("FlexPoolGrad").Device(DEVICE_CPU).TypeConstraint<T>("T"), \
-      FlexPoolGradOp<CPUDevice, T>)
+#define REGISTER_CUSTOM_OP(NAME, DEVICE, T)                       \
+  REGISTER_KERNEL_BUILDER(                                        \
+      Name(#NAME).Device(DEVICE_##DEVICE).TypeConstraint<T>("T"), \
+      NAME##Op<DEVICE##Device, T>)
 
-TF_CALL_float(REGISTER_FLEXPOOL_OP_CPU);
-#undef REGISTER_FLEXPOOL_OP_CPU
+REGISTER_CUSTOM_OP(FlexPool, CPU, float);
+REGISTER_CUSTOM_OP(FlexPoolGrad, CPU, float);
+REGISTER_CUSTOM_OP(FlexPool, CPU, double);
+REGISTER_CUSTOM_OP(FlexPoolGrad, CPU, double);
 
-// Register the GPU kernels.
 #ifdef GOOGLE_CUDA
-
-#define REGISTER_FLEXPOOL_OP_GPU(T)                                   \
-  REGISTER_KERNEL_BUILDER(                                            \
-      Name("FlexPool").Device(DEVICE_GPU).TypeConstraint<T>("T"),     \
-      FlexPoolOp<GPUDevice, T>)                                       \
-  REGISTER_KERNEL_BUILDER(                                            \
-      Name("FlexPoolGrad").Device(DEVICE_GPU).TypeConstraint<T>("T"), \
-      FlexPoolGradOp<GPUDevice, T>)
-
-TF_CALL_float(REGISTER_FLEXPOOL_OP_GPU);
-#undef REGISTER_FLEXPOOL_OP_GPU
-
+REGISTER_CUSTOM_OP(FlexPool, GPU, float);
+REGISTER_CUSTOM_OP(FlexPoolGrad, GPU, float);
+REGISTER_CUSTOM_OP(FlexPool, GPU, double);
+REGISTER_CUSTOM_OP(FlexPoolGrad, GPU, double);
 #endif  // GOOGLE_CUDA
+#undef REGISTER_CUSTOM_OP
 
 }  // namespace tensorflow

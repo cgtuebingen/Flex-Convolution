@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-//Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
+// Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
 
 #if GOOGLE_CUDA
 
@@ -20,6 +20,7 @@ limitations under the License.
 
 #include <cub/cub.cuh>
 
+#include "cuda_utils.h"
 #include "flex_conv_op.h"
 #include "tensorflow/core/util/cuda_kernel_helper.h"
 
@@ -57,10 +58,10 @@ struct ForwardKernel {
   }
 
   __device__ __forceinline__ void operator()() const {
-    extern __shared__ Dtype s_shm[];
+    Dtype* s_shm = DynamicSharedMemory<Dtype>();
 
-    Dtype* s_theta = (float*)&s_shm[0];
-    Dtype* s_bias = (float*)&s_shm[Dp * C_Din * C_Dout];
+    Dtype* s_theta = (Dtype*)&s_shm[0];
+    Dtype* s_bias = (Dtype*)&s_shm[Dp * C_Din * C_Dout];
 
     // glob ids
     int b = blockIdx.z;
@@ -281,7 +282,8 @@ struct BackwardFeatureKernel {
   }
 
   __device__ __forceinline__ void operator()() const {
-    extern __shared__ float s_shm[];
+    // extern __shared__ float s_shm[];
+    Dtype* s_shm = DynamicSharedMemory<Dtype>();
 
     int i_n = threadIdx.x;
     int i_din = threadIdx.y;
@@ -354,7 +356,10 @@ struct BackwardFeatureKernel {
             W += s_bias[i_din * C_Dout + dout_inner];
             Dtype value = W * s_topdiff[dout_inner * C_N + i_n];
 
-            atomicAdd(
+            // atomicAdd(
+            //     &d_features_out[b * Din * N + din * N + s_nk[k * C_N + i_n]],
+            //     value);
+            tensorflow::CudaAtomicAdd(
                 &d_features_out[b * Din * N + din * N + s_nk[k * C_N + i_n]],
                 value);
           }
@@ -384,6 +389,16 @@ struct BackwardFeatureKernel {
 namespace tensorflow {
 namespace functor {
 
+template <class Dtype, class NBtype>
+struct ForwardKernelType {
+  typedef FlexConvCuda::ForwardKernel<Dtype, NBtype, 3, 128, 32, 32> type;
+};
+
+template <>
+struct ForwardKernelType<float, int> {
+  typedef FlexConvCuda::ForwardKernel<float, int, 3, 128, 32, 64> type;
+};
+
 template <typename Dtype>
 struct FlexConvFunctor<GPUDevice, Dtype> {
   void operator()(::tensorflow::OpKernelContext* ctx, const Tensor& features,
@@ -399,7 +414,11 @@ struct FlexConvFunctor<GPUDevice, Dtype> {
     const int Din = theta.dim_size(2);
     const int Dout = theta.dim_size(3);
 
-    FlexConvCuda::ForwardKernel<Dtype, NBtype, 3, 128, 32, 64> fwk;
+    //    printf("<f> test: %s\n", __PRETTY_FUNCTION__);
+
+    typedef typename ForwardKernelType<Dtype, NBtype>::type FKT;
+
+    FKT fwk;
     fwk.N = N;
     fwk.K = K;
     fwk.Din = Din;
@@ -422,6 +441,7 @@ struct FlexConvFunctor<GPUDevice, Dtype> {
 };
 
 template struct FlexConvFunctor<GPUDevice, float>;
+template struct FlexConvFunctor<GPUDevice, double>;
 
 template <typename Dtype>
 struct FlexConvGrad<GPUDevice, Dtype> {
@@ -459,7 +479,7 @@ struct FlexConvGrad<GPUDevice, Dtype> {
 
     const Dtype* topdiff_ptr = reinterpret_cast<const Dtype*>(topdiff.data());
 
-    Dtype* grad_features_ptr = reinterpret_cast<float*>(grad_features.data());
+    Dtype* grad_features_ptr = reinterpret_cast<Dtype*>(grad_features.data());
     Dtype* grad_theta_ptr = reinterpret_cast<Dtype*>(grad_theta.data());
     Dtype* grad_bias_ptr = reinterpret_cast<Dtype*>(grad_bias.data());
 
@@ -525,6 +545,7 @@ struct FlexConvGrad<GPUDevice, Dtype> {
 };
 
 template struct FlexConvGrad<GPUDevice, float>;
+template struct FlexConvGrad<GPUDevice, double>;
 
 }  // namespace functor
 }  // namespace tensorflow

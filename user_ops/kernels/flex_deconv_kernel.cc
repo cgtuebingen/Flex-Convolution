@@ -71,6 +71,7 @@ struct FlexDeconvFunctor<CPUDevice, Dtype> {
 };
 
 template struct FlexDeconvFunctor<CPUDevice, float>;
+template struct FlexDeconvFunctor<CPUDevice, double>;
 
 template <typename Dtype>
 struct FlexDeconvGrad<CPUDevice, Dtype> {
@@ -165,9 +166,8 @@ struct FlexDeconvGrad<CPUDevice, Dtype> {
   }
 };
 
-// template struct FlexDeconvGrad<CPUDevice, int>;
 template struct FlexDeconvGrad<CPUDevice, float>;
-// template struct FlexDeconvGrad<CPUDevice, double>;
+template struct FlexDeconvGrad<CPUDevice, double>;
 
 }  // namespace functor
 }  // namespace tensorflow
