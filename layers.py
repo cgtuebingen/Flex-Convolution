@@ -58,21 +58,14 @@ class FlexPooling(Layer):
   """
 
   def __init__(self,
-               features,
-               neighborhoods,
                data_format='simple',
                name=None):
 
     super(FlexPooling, self).__init__(name=name)
-    self.features = features
-    self.neighborhoods = neighborhoods
     self.data_format = data_format
 
   def compute_output_shape(self, input_shape):
     return tensor_shape.TensorShape(input_shape)
-
-  def build(self, input_shape):
-    self.built = True
 
   def call(self, inputs):
     if not isinstance(inputs, list):
@@ -99,10 +92,7 @@ def flex_pooling(features,
                  data_format='simple',
                  name=None):
 
-  layer = FlexPooling(features,
-                      neighborhoods,
-                      data_format=data_format,
-                      name=name)
+  layer = FlexPooling(data_format=data_format, name=name)
 
   return layer.apply([features, neighborhoods])
 
@@ -126,9 +116,6 @@ class FlexConvolution(Layer):
         - bias term which is added tot the features [Dout]
 
   Arguments:
-      features: A `Tensor` of the format [B, Din, (1), N].
-      positions: A `Tensor` of the format [B, Dp, (1), N].
-      neighborhoods: A `Tensor` of the format [B, K, (1), N] (tf.int32).
       filters: Integer, the dimensionality of the output space (i.e. the number
         of filters in the convolution).
       activation: Activation function. Set it to None to maintain a
@@ -147,12 +134,15 @@ class FlexConvolution(Layer):
         `GraphKeys.TRAINABLE_VARIABLES` (see `tf.Variable`).
       name: A string, the name of the layer.
 
+  Inputs:
+      features: A `Tensor` of the format[B, Din, (1), N].
+  positions: A `Tensor` of the format[B, Dp, (1), N].
+  neigh
+borhoods: A `Tensor` of the format [B, K, (1), N] (tf.int32).
+
   """
 
   def __init__(self,
-               features,
-               positions,
-               neighborhoods,
                filters,
                activation=None,
                kernel_initializer=None,
@@ -165,10 +155,6 @@ class FlexConvolution(Layer):
 
     super(FlexConvolution, self).__init__(trainable=trainable,
                                           name=name)
-    self.features = features
-    self.positions = positions
-    self.neighborhoods = neighborhoods
-
     self.filters = int(filters)
     self.activation = activations.get(activation)
     self.use_feature_bias = use_feature_bias
@@ -177,22 +163,21 @@ class FlexConvolution(Layer):
     self.position_bias_initializer = initializers.get(position_bias_initializer)
     self.features_bias_initializer = initializers.get(features_bias_initializer)
 
-  def compute_output_shape(self, input_shape):
-    input_shape = tensor_shape.TensorShape(input_shape)
-    input_shape[1] = self.filters
-    return input_shape
+  def compute_output_shape(self, input_shapes):
+    assert isinstance(input_shapes, list)
+    output_shape = input_shapes[0]
+    output_shape[1] = self.filters
+    return output_shape
 
-  def build(self, input_shape):
+  def build(self, input_shapes):
+    assert isinstance(input_shapes, list)
+
     if self.data_format == 'expanded':
-      features = _remove_dim(self.features, 2)
-      positions = _remove_dim(self.positions, 2)
+      _, Din, _, N = input_shapes[0].as_list()
     else:
-      features = self.features
-      positions = self.positions
-    [B, Din, N] = features.shape
-    Din = int(Din)
-    N = int(N)
-    Dp = int(positions.shape[1])
+      _, Din, N = input_shapes[0].as_list()
+
+    Dp = input_shapes[1].as_list()[1]
     Dout = self.filters
 
     self.position_theta = self.add_weight(
@@ -220,8 +205,30 @@ class FlexConvolution(Layer):
       self.feature_bias = None
     self.built = True
 
-  def call(self, inputs):
+  def internal_call(self,
+                    features,
+                    positions,
+                    neighborhoods,
+                    theta,
+                    bias):
+    return _flex_convolution(features, positions, neighborhoods,
+                             theta, bias)
 
+  def call(self, inputs):
+    """
+    Args:
+        inputs[0] (tf.tensor): A `Tensor` of the format [B, Din, (1), N]
+          describing the incoming features.
+        inputs[1] (tf.tensor): A `Tensor` of the format [B, Dp, (1), N]
+          containing the position of the incoming features.
+        inputs[2] (tf.tensor): A `Tensor` of the format [B, K, (1), N]
+          containting the neighborhood structure (tf.int32).
+
+    Returns:
+        tf.tensor: A `Tensor` of the format [B, Dout, (1), N] describing
+        the outgoing features.
+
+    """
     if not isinstance(inputs, list):
       raise ValueError('A flexconv layer should be called '
                        'on a list of inputs.')
@@ -235,8 +242,8 @@ class FlexConvolution(Layer):
       positions = _remove_dim(positions, 2)
       neighborhoods = _remove_dim(neighborhoods, 2)
 
-    y = _flex_convolution(features, positions, neighborhoods,
-                          self.position_theta, self.position_bias)
+    y = self.internal_call(features, positions, neighborhoods,
+                           self.position_theta, self.position_bias)
 
     if self.use_feature_bias:
       y = tf.add(y, self.feature_bias)
@@ -263,10 +270,7 @@ def flex_convolution(features,
                      trainable=True,
                      name=None):
 
-  layer = FlexConvolution(features,
-                          positions,
-                          neighborhoods,
-                          filters,
+  layer = FlexConvolution(filters,
                           activation=activation,
                           kernel_initializer=kernel_initializer,
                           position_bias_initializer=position_bias_initializer,
@@ -298,9 +302,6 @@ class FlexConvolutionTranspose(FlexConvolution):
         - bias term which is added tot the features [Dout]
 
   Arguments:
-      features: A `Tensor` of the format [B, Din, (1), N].
-      positions: A `Tensor` of the format [B, Dp, (1), N].
-      neighborhoods: A `Tensor` of the format [B, K, (1), N] (tf.int32).
       filters: Integer, the dimensionality of the output space (i.e. the number
         of filters in the convolution).
       activation: Activation function. Set it to None to maintain a
@@ -319,36 +320,21 @@ class FlexConvolutionTranspose(FlexConvolution):
         `GraphKeys.TRAINABLE_VARIABLES` (see `tf.Variable`).
       name: A string, the name of the layer.
 
+  Inputs:
+      features: A `Tensor` of the format [B, Din, (1), N].
+      positions: A `Tensor` of the format [B, Dp, (1), N].
+      neighborhoods: A `Tensor` of the format [B, K, (1), N] (tf.int32).
+
   """
 
-  def call(self, inputs):
-
-    if not isinstance(inputs, list):
-      raise ValueError('A flexconv layer should be called '
-                       'on a list of inputs.')
-
-    features = ops.convert_to_tensor(inputs[0], dtype=self.dtype)
-    positions = ops.convert_to_tensor(inputs[1], dtype=self.dtype)
-    neighborhoods = ops.convert_to_tensor(inputs[2], dtype=tf.int32)
-
-    if self.data_format == 'expanded':
-      features = _remove_dim(features, 2)
-      positions = _remove_dim(positions, 2)
-      neighborhoods = _remove_dim(neighborhoods, 2)
-
-    y = _flex_convolution_transpose(features, positions, neighborhoods,
-                                    self.position_theta, self.position_bias)
-
-    if self.use_feature_bias:
-      y = tf.add(y, self.feature_bias)
-
-    if self.activation is not None:
-      y = self.activation(y)
-
-    if self.data_format == 'expanded':
-      y = tf.expand_dims(y, axis=2)
-
-    return y
+  def internal_call(self,
+                    features,
+                    positions,
+                    neighborhoods,
+                    theta,
+                    bias):
+    return _flex_convolution_transpose(features, positions, neighborhoods,
+                                       theta, bias)
 
 
 def flex_convolution_transpose(features,
@@ -364,10 +350,7 @@ def flex_convolution_transpose(features,
                                trainable=True,
                                name=None):
 
-  layer = FlexConvolutionTranspose(features,
-                                   positions,
-                                   neighborhoods,
-                                   filters,
+  layer = FlexConvolutionTranspose(filters,
                                    activation=activation,
                                    kernel_initializer=kernel_initializer,
                                    position_bias_initializer=position_bias_initializer,
