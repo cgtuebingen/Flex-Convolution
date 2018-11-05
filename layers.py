@@ -24,7 +24,7 @@ from user_ops import flex_convolution_transpose as _flex_convolution_transpose
 
 from tensorflow.python.keras import activations
 from tensorflow.python.keras import initializers
-from tensorflow.python.keras.engine.base_layer import Layer
+from tensorflow.python.layers.base import Layer
 from tensorflow.python.util.tf_export import tf_export
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.framework import ops
