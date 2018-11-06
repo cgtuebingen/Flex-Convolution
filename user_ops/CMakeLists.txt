@@ -33,6 +33,7 @@ set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -std=c++11 -O3 -Xptxas=-v --expt-relaxed
 
 # quick fix for drone-ci
 include_directories(SYSTEM "/usr/local/")
+include_directories(SYSTEM "/extra/samples/Common/")
 # fix cgtuebingen
 include_directories(SYSTEM "/graphics/opt/opt_Ubuntu18.04/cuda/toolkit_9.2")
 

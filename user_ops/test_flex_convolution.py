@@ -114,23 +114,23 @@ class FlexConvTest(VerboseTestCase):
     actual, expected = self._backward_theta(use_gpu=True, dtype=np.float64)
     self.assertAllClose(actual, expected)
 
+  # float32 has some numerical instabilities due to summation
+  # central difference as derivatives are totally instable
+  # hence we just compare cpu and gpu outputs (float64 num-diff tests pass)
   def test_backward_features_gpu_float32(self, dtype=np.float32):
     cpu = self._backward_features(use_gpu=False, dtype=dtype, numdiff=False)
     gpu = self._backward_features(use_gpu=True, dtype=dtype, numdiff=False)
-    self.assertAllClose(cpu, gpu)
+    self.assertAllClose(cpu, gpu, 1e-3)
 
   def test_backward_bias_gpu_float32(self, dtype=np.float32):
     cpu = self._backward_bias(use_gpu=False, dtype=dtype, numdiff=False)
     gpu = self._backward_bias(use_gpu=True, dtype=dtype, numdiff=False)
-    self.assertAllClose(cpu, gpu, 1e-5)
+    self.assertAllClose(cpu, gpu, 1e-4)
 
   def test_backward_theta_gpu_float32(self, dtype=np.float32):
     cpu = self._backward_theta(use_gpu=False, dtype=dtype, numdiff=False)
     gpu = self._backward_theta(use_gpu=True, dtype=dtype, numdiff=False)
-    self.assertAllClose(cpu, gpu)
-
-
-
+    self.assertAllClose(cpu, gpu, 1e-4)
 
 
 if __name__ == '__main__':

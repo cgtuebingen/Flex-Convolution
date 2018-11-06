@@ -18,30 +18,51 @@ This repository contains the source code of our FlexConv Layer from our 2018 ACC
 
 <p align="center"> <a href="https://www.youtube.com/watch?v=5ftWmuQXU_s"><img src="./.github/youtube.jpg" width="50%"></a> </p>
 
-
-Example - Usage
+Provided novel operations
 -------------------
+In the following we summarize the operations described in our paper along with a highly tuned (online, exhaustive) nearest neighbor search layer for 3d point-clouds.
+All layers follow the `tf.layers` interface and can be directly used in your TensorFlow model. We further provide unit-tests to verify the correctness of our implementation.
 
-We provide GPU-tailored CUDA implementations of our novel FlexConv, FlexPool, FlexDeconv operations in TensorFlow.
+```python
+# some point-cloud data
+features = np.random.randn(B, Din, N).astype(np.float32)
+positions = np.random.randn(B, Dp, N).astype(np.float32)
 
-```console
-user@host $ cd user_ops
-user@host $ cmake . -DPYTHON_EXECUTABLE=python2 && make -j
-user@host $ cd ..
-user@host $ python example.py
+# To find neighborhoods of K neighbors (not used in our paper, just for your convenience):
+neighborhoods = knn_bruteforce(positions, K=8)
+
+# To apply our Flex-Convolution operation to a given set of points with some input-features, position and neighborhood information:
+new_features = flex_convolution(features, positions, neighborhoods, out_channels=32)
+new_features = flex_convolution_transpose(features, positions, neighborhoods, out_channels=32)
+
+# To apply max-pooling for each neighborhood:
+new_features = flex_pooling(features, neighborhoods)
 ```
 
-
-Experiments
+Build Instructions
 -------------------
 
-Deep learning on point-clouds is a complex matter and our codebase reflects that complexity.
-We are currently working on refactoring our research implementation to ease the usage. Therefore,
-`layers.py` contains a Keras/tf.layers compatible implementation. We will add the models later.
+We provide GPU-tailored CUDA implementations of our novel FlexConv, FlexPool, FlexDeconv, NearestNeighbor operations in TensorFlow, which require a compilation/linking step. To build our operations just use
+
+```console
+user@host $ pip install tensorflow-gpu --user                # optional if not yet installed
+user@host $ cd user_ops
+user@host $ cmake . -DPYTHON_EXECUTABLE=python2 && make -j   # switch the python version when necessary
+user@host $ python test_all.py                               # run all unit-tests to verify the operations
+user@host $ cd ..
+user@host $ python example.py                                # fully functional toy-example
+```
+
+Deep learning on point-clouds is a complex matter and an active research area. Hence, our internal codebase reflects that complexity and we try our best to provide a usable implementation.
+To provide a simple training example, we demonstrate training on a very basic 3D-MNIST dataset which deliberately omits fancy parts to give you an idea how to actually train such a model with our operations:
+
+```console
+user@host $ python basic_mnist_3d.py --gpu 0
+```
 
 ### Benchmark
 
-We benchmarked the inference time of *entire* network on the 2D-3D-S dataset and with a recent test on a NVIDIA V100 GPU, we were able to process ~18 Million Points.
+We benchmarked the inference time of *entire* network on the 2D-3D-S dataset and with a recent test on a NVIDIA V100 GPU, we were able to process ~18 Million Points (the paper stated 7 Million Points on 1080 GTX).
 
 <p align="center"> <img src=".github/inference_time.png" width="50%"> </p>
 

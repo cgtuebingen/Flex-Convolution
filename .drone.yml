@@ -4,6 +4,7 @@ pipeline:
     environment:
       - CUB_INC=/extra/cub-1.8.0/
     commands:
+      - git clone --single-branch --depth 1 https://github.com/NVIDIA/cuda-samples.git /extra/samples
       - export LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs:$${LD_LIBRARY_PATH}
       - cd user_ops
       - cmake . -DPYTHON_EXECUTABLE=python2
