@@ -81,7 +81,7 @@ class KnnBruteforce(Layer):
     if self.data_format == 'expanded':
       positions = _remove_dim(positions, 2)
 
-    NN, _, _ = _knn_bruteforce(positions, K=4)
+    NN, _, _ = _knn_bruteforce(positions, K=self.K)
     NN = tf.transpose(NN, [0, 2, 1])
 
     if self.data_format == 'expanded':
