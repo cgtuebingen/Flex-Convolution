@@ -56,7 +56,7 @@ class FakePointCloud(object):
       # return (np.random.randn(*shape) * 100).astype(np.int32).astype(np.float32)
       return np.random.randn(*shape).astype(np.float32)
 
-    self.theta = random_values([1, self.Dp, self.Din, self.Dout]).astype(dtype)
+    self.theta = random_values([self.Dp, self.Din, self.Dout]).astype(dtype)
     self.bias = random_values([self.Din, self.Dout]).astype(dtype)
 
     self.position = random_values([self.B, self.Dp, self.N]).astype(dtype)

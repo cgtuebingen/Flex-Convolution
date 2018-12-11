@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-//Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
+// Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
 
 #include "flex_deconv_op.h"
 #include "tensorflow/core/framework/op.h"
@@ -28,7 +28,7 @@ struct FlexDeconvFunctor<CPUDevice, Dtype> {
                   const Tensor& neighborhood_, const Tensor& positions_,
                   Tensor* output_) {
     const auto features = features_.tensor<Dtype, 3>();
-    const auto theta = theta_.tensor<Dtype, 4>();
+    const auto theta = theta_.tensor<Dtype, 3>();
     const auto bias = bias_.tensor<Dtype, 2>();
     const auto neighborhood = neighborhood_.tensor<int, 3>();
     const auto positions = positions_.tensor<Dtype, 3>();
@@ -39,9 +39,9 @@ struct FlexDeconvFunctor<CPUDevice, Dtype> {
     const int B = neighborhood_.dim_size(0);
     const int K = neighborhood_.dim_size(1);
     const int N = neighborhood_.dim_size(2);
-    const int Dp = theta_.dim_size(1);
-    const int Din = theta_.dim_size(2);
-    const int Dout = theta_.dim_size(3);
+    const int Dp = theta_.dim_size(0);
+    const int Din = theta_.dim_size(1);
+    const int Dout = theta_.dim_size(2);
 
     output.setZero();
 
@@ -59,7 +59,7 @@ struct FlexDeconvFunctor<CPUDevice, Dtype> {
               for (int dp = 0; dp < Dp; ++dp) {
                 Dtype delta =
                     positions(b, dp, other_k) - positions(b, dp, self_k);
-                W += theta(0, dp, din, dout) * delta;
+                W += theta(dp, din, dout) * delta;
               }
               output(b, dout, other_k) = output(b, dout, other_k) + W * v;
             }
@@ -81,23 +81,23 @@ struct FlexDeconvGrad<CPUDevice, Dtype> {
                   const Tensor& topdiff_, Tensor* grad_features_,
                   Tensor* grad_theta_, Tensor* grad_bias_) {
     const auto features = features_.tensor<Dtype, 3>();
-    const auto theta = theta_.tensor<Dtype, 4>();
+    const auto theta = theta_.tensor<Dtype, 3>();
     const auto bias = bias_.tensor<Dtype, 2>();
     const auto neighborhood = neighborhood_.tensor<int, 3>();
     const auto positions = positions_.tensor<Dtype, 3>();
     const auto topdiff = topdiff_.tensor<Dtype, 3>();
 
     auto grad_features = grad_features_->tensor<Dtype, 3>();
-    auto grad_theta = grad_theta_->tensor<Dtype, 4>();
+    auto grad_theta = grad_theta_->tensor<Dtype, 3>();
     auto grad_bias = grad_bias_->tensor<Dtype, 2>();
 
     // get dimensions
     const int B = neighborhood_.dim_size(0);
     const int K = neighborhood_.dim_size(1);
     const int N = neighborhood_.dim_size(2);
-    const int Dp = theta_.dim_size(1);
-    const int Din = theta_.dim_size(2);
-    const int Dout = theta_.dim_size(3);
+    const int Dp = theta_.dim_size(0);
+    const int Din = theta_.dim_size(1);
+    const int Dout = theta_.dim_size(2);
 
     grad_features.setZero();
     grad_theta.setZero();
@@ -132,9 +132,8 @@ struct FlexDeconvGrad<CPUDevice, Dtype> {
               for (int dp = 0; dp < Dp; ++dp) {
                 const Dtype delta =
                     positions(b, dp, other_k) - positions(b, dp, self_k);
-                grad_theta(0, dp, din, dout) += features(b, din, self_k) *
-                                                delta *
-                                                topdiff(b, dout, other_k);
+                grad_theta(dp, din, dout) += features(b, din, self_k) * delta *
+                                             topdiff(b, dout, other_k);
               }
             }
           }
@@ -155,7 +154,7 @@ struct FlexDeconvGrad<CPUDevice, Dtype> {
               for (int dp = 0; dp < Dp; ++dp) {
                 const Dtype delta =
                     positions(b, dp, other_k) - positions(b, dp, self_k);
-                W += theta(0, dp, din, dout) * delta;
+                W += theta(dp, din, dout) * delta;
               }
               grad_features(b, din, self_k) += W * topdiff(b, dout, other_k);
             }

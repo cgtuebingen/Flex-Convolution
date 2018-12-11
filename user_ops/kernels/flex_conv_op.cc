@@ -42,7 +42,7 @@ class FlexConvOp : public OpKernel {
 
     const int B = neighborhood_.shape().dim_size(0);
     const int N = neighborhood_.shape().dim_size(2);
-    const int Dout = theta_.shape().dim_size(3);
+    const int Dout = theta_.shape().dim_size(2);
 
     Tensor* output_ = nullptr;
     OP_REQUIRES_OK(
@@ -77,8 +77,6 @@ class FlexConvGradOp : public OpKernel {
     Tensor* grad_features_ = nullptr;
     Tensor* grad_theta_ = nullptr;
     Tensor* grad_bias_ = nullptr;
-
-    const int Degree = theta_.shape().dim_size(0);
 
     OP_REQUIRES_OK(ctx,
                    ctx->allocate_output(0, features_.shape(), &grad_features_));

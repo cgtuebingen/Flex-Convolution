@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-//Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
+// Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
 
 #if GOOGLE_CUDA
 
@@ -157,9 +157,9 @@ struct FlexDeconvFunctor<GPUDevice, Dtype> {
     const int B = neighborhood_.dim_size(0);
     const int K = neighborhood_.dim_size(1);
     const int N = neighborhood_.dim_size(2);
-    const int Dp = theta_.dim_size(1);
-    const int Din = theta_.dim_size(2);
-    const int Dout = theta_.dim_size(3);
+    const int Dp = theta_.dim_size(0);
+    const int Din = theta_.dim_size(1);
+    const int Dout = theta_.dim_size(2);
 
     const int threads = 32;
     dim3 block(threads, threads, 1);
@@ -190,9 +190,9 @@ struct FlexDeconvGrad<GPUDevice, Dtype> {
     const int B = neighborhood_.dim_size(0);
     const int K = neighborhood_.dim_size(1);
     const int N = neighborhood_.dim_size(2);
-    const int Dp = theta_.dim_size(1);
-    const int Din = theta_.dim_size(2);
-    const int Dout = theta_.dim_size(3);
+    const int Dp = theta_.dim_size(0);
+    const int Din = theta_.dim_size(1);
+    const int Dout = theta_.dim_size(2);
 
     const int threads = 32;
     dim3 block(threads, threads, 1);

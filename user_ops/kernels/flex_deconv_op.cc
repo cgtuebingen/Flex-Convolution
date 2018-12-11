@@ -41,7 +41,7 @@ class FlexDeconvOp : public OpKernel {
 
     const int B = neighborhood_.shape().dim_size(0);
     const int N = neighborhood_.shape().dim_size(2);
-    const int Dout = theta_.shape().dim_size(3);
+    const int Dout = theta_.shape().dim_size(2);
 
     Tensor* output_ = nullptr;
     OP_REQUIRES_OK(

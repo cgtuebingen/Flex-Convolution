@@ -41,7 +41,7 @@ REGISTER_OP("FlexDeconv")
       ::tensorflow::shape_inference::ShapeHandle shape_hnd;
       TF_RETURN_IF_ERROR(c->WithRank(features, 3, &shape_hnd));  // B x Din x N
       TF_RETURN_IF_ERROR(
-          c->WithRank(theta, 4, &shape_hnd));  // 1 x Dp x Din x Dout
+          c->WithRank(theta, 3, &shape_hnd));  // Dp x Din x Dout
       TF_RETURN_IF_ERROR(c->WithRank(bias, 2, &shape_hnd));  // Din x Dout
       TF_RETURN_IF_ERROR(
           c->WithRank(neighborhood, 3, &shape_hnd));             // B x K x N
@@ -63,14 +63,14 @@ REGISTER_OP("FlexDeconv")
 
       // assert Dp equal
       TF_RETURN_IF_ERROR(
-          c->Merge(c->Dim(theta, 1), c->Dim(position, 1), &merged));
+          c->Merge(c->Dim(theta, 0), c->Dim(position, 1), &merged));
 
       // assert Dout equal
-      TF_RETURN_IF_ERROR(c->Merge(c->Dim(theta, 3), c->Dim(bias, 1), &merged));
+      TF_RETURN_IF_ERROR(c->Merge(c->Dim(theta, 2), c->Dim(bias, 1), &merged));
 
       // assert Din equal
       TF_RETURN_IF_ERROR(
-          c->Merge(c->Dim(features, 1), c->Dim(theta, 2), &merged));
+          c->Merge(c->Dim(features, 1), c->Dim(theta, 1), &merged));
       TF_RETURN_IF_ERROR(
           c->Merge(c->Dim(features, 1), c->Dim(bias, 0), &merged));
 
@@ -88,7 +88,7 @@ Apply Sparse Convolution to inputs.
 This applies a deconvolution to a neighborhood of inputs. F_i spread its value to all neighbors.
 
 features: each feature description for each point [B, Din, N].
-theta: parameters for kernel function [1, Dp, Din, Dout].
+theta: parameters for kernel function [Dp, Din, Dout].
 bias: bias for kernel function [Din, Dout].
 neighborhood: all K nearest neighbors [B, K, N].
 position: each datapoint in 3d space [B, Dp, N].
@@ -119,7 +119,7 @@ gradients: topdiff[B, N, Dout].
 neighborhood: all K nearest neighbors [B, K, N].
 position: each datapoint in 3d space [B, Dp, N].
 features: each feature description for each point [B, Din, N].
-theta: parameters for kernel function [1, Dp, Din, Dout].
+theta: parameters for kernel function [Dp, Din, Dout].
 bias: bias for kernel function [Din, Dout].
 grad_features: gradient to each feature description for each point [B, N, Din].
 grad_theta: gradient to parameters for kernel function [1, Dp, Din, Dout].

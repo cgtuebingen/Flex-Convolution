@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-//Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
+// Authors: Fabian Groh, Patrick Wieschollek, Hendrik P.A. Lensch
 
 #include "flex_conv_op.h"
 #include "tensorflow/core/framework/op.h"
@@ -28,7 +28,7 @@ struct FlexConvFunctor<CPUDevice, Dtype> {
                   const Tensor& neighborhood_, const Tensor& positions_,
                   Tensor* output_) {
     const auto features = features_.tensor<Dtype, 3>();
-    const auto theta = theta_.tensor<Dtype, 4>();
+    const auto theta = theta_.tensor<Dtype, 3>();
     const auto bias = bias_.tensor<Dtype, 2>();
     const auto neighborhood = neighborhood_.tensor<int, 3>();
     const auto positions = positions_.tensor<Dtype, 3>();
@@ -39,9 +39,9 @@ struct FlexConvFunctor<CPUDevice, Dtype> {
     const int B = neighborhood_.dim_size(0);
     const int K = neighborhood_.dim_size(1);
     const int N = neighborhood_.dim_size(2);
-    const int Dp = theta_.dim_size(1);
-    const int Din = theta_.dim_size(2);
-    const int Dout = theta_.dim_size(3);
+    const int Dp = theta_.dim_size(0);
+    const int Din = theta_.dim_size(1);
+    const int Dout = theta_.dim_size(2);
 
     output.setZero();
 
@@ -58,7 +58,7 @@ struct FlexConvFunctor<CPUDevice, Dtype> {
               for (int dp = 0; dp < Dp; ++dp) {
                 Dtype delta = positions(b, dp, k) -
                               positions(b, dp, neighborhood(b, 0, n));
-                W += theta(0, dp, din, dout) * delta;
+                W += theta(dp, din, dout) * delta;
               }
               output(b, dout, n) = output(b, dout, n) + W * v;
             }
@@ -80,14 +80,14 @@ struct FlexConvGrad<CPUDevice, Dtype> {
                   const Tensor& topdiff_, Tensor* grad_features_,
                   Tensor* grad_theta_, Tensor* grad_bias_) {
     const auto features = features_.tensor<Dtype, 3>();
-    const auto theta = theta_.tensor<Dtype, 4>();
+    const auto theta = theta_.tensor<Dtype, 3>();
     const auto bias = bias_.tensor<Dtype, 2>();
     const auto neighborhood = neighborhood_.tensor<int, 3>();
     const auto positions = positions_.tensor<Dtype, 3>();
     const auto topdiff = topdiff_.tensor<Dtype, 3>();
 
     auto grad_features = grad_features_->tensor<Dtype, 3>();
-    auto grad_theta = grad_theta_->tensor<Dtype, 4>();
+    auto grad_theta = grad_theta_->tensor<Dtype, 3>();
     auto grad_bias = grad_bias_->tensor<Dtype, 2>();
 
     // get dimensions
@@ -95,9 +95,9 @@ struct FlexConvGrad<CPUDevice, Dtype> {
     const int K = neighborhood_.dim_size(1);
     const int N = neighborhood_.dim_size(2);
     const int Ddegree = theta_.dim_size(0);
-    const int Dp = theta_.dim_size(1);
-    const int Din = theta_.dim_size(2);
-    const int Dout = theta_.dim_size(3);
+    const int Dp = theta_.dim_size(0);
+    const int Din = theta_.dim_size(1);
+    const int Dout = theta_.dim_size(2);
 
     grad_features.setZero();
     grad_theta.setZero();
@@ -129,12 +129,9 @@ struct FlexConvGrad<CPUDevice, Dtype> {
               for (int i = 0; i < Dp; ++i) {
                 const Dtype delta =
                     positions(b, i, k) - positions(b, i, neighborhood(b, 0, n));
-                // printf("delta %f\n", delta);
 
-                for (int dd = 0; dd < Ddegree; ++dd) {
-                  grad_theta(dd, i, j, l) +=
-                      features(b, j, k) * pow(delta, dd + 1) * topdiff(b, l, n);
-                }
+                grad_theta(i, j, l) +=
+                    features(b, j, k) * delta * topdiff(b, l, n);
               }
             }
           }
@@ -154,8 +151,8 @@ struct FlexConvGrad<CPUDevice, Dtype> {
               for (int i = 0; i < Dp; ++i) {
                 const Dtype delta =
                     positions(b, i, k) - positions(b, i, neighborhood(b, 0, n));
-                for (int dd = 0; dd < Ddegree; ++dd)
-                  W += theta(dd, i, j, l) * pow(delta, dd + 1);
+
+                W += theta(i, j, l) * delta;
               }
               grad_features(b, j, k) += W * topdiff(b, l, n);
             }

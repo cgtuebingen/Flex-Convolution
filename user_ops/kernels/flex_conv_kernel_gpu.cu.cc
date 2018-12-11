@@ -410,9 +410,9 @@ struct FlexConvFunctor<GPUDevice, Dtype> {
     const int B = neighborhood.dim_size(0);
     const int K = neighborhood.dim_size(1);
     const int N = neighborhood.dim_size(2);
-    const int Dp = theta.dim_size(1);
-    const int Din = theta.dim_size(2);
-    const int Dout = theta.dim_size(3);
+    const int Dp = theta.dim_size(0);
+    const int Din = theta.dim_size(1);
+    const int Dout = theta.dim_size(2);
 
     //    printf("<f> test: %s\n", __PRETTY_FUNCTION__);
 
@@ -451,23 +451,23 @@ struct FlexConvGrad<GPUDevice, Dtype> {
                   const Tensor& topdiff_, Tensor* grad_features_,
                   Tensor* grad_theta_, Tensor* grad_bias_) {
     const auto features = features_.tensor<Dtype, 3>();
-    const auto theta = theta_.tensor<Dtype, 4>();
+    const auto theta = theta_.tensor<Dtype, 3>();
     const auto bias = bias_.tensor<Dtype, 2>();
     const auto neighborhood = neighborhood_.tensor<int, 3>();
     const auto positions = positions_.tensor<Dtype, 3>();
     const auto topdiff = topdiff_.tensor<Dtype, 3>();
 
     auto grad_features = grad_features_->tensor<Dtype, 3>();
-    auto grad_theta = grad_theta_->tensor<Dtype, 4>();
+    auto grad_theta = grad_theta_->tensor<Dtype, 3>();
     auto grad_bias = grad_bias_->tensor<Dtype, 2>();
 
     // get dimensions
     const int B = neighborhood_.dim_size(0);
     const int K = neighborhood_.dim_size(1);
     const int N = neighborhood_.dim_size(2);
-    const int Dp = theta_.dim_size(1);
-    const int Din = theta_.dim_size(2);
-    const int Dout = theta_.dim_size(3);
+    const int Dp = theta_.dim_size(0);
+    const int Din = theta_.dim_size(1);
+    const int Dout = theta_.dim_size(2);
 
     const int* neighborhood_ptr =
         reinterpret_cast<const int*>(neighborhood.data());

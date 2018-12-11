@@ -256,7 +256,7 @@ class FlexConvolution(Layer):
 
     self.position_theta = self.add_weight(
         'position_theta',
-        shape=[1, Dp, Din, Dout],
+        shape=[Dp, Din, Dout],
         initializer=self.kernel_initializer,
         dtype=self.dtype,
         trainable=True)
