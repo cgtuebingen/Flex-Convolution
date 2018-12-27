@@ -42,6 +42,17 @@ new_features = flex_pooling(features, neighborhoods)
 Build Instructions
 -------------------
 
+Our CUDA kernel implementations use [CUB primitives](https://nvlabs.github.io/cub/). You might install this header-only library by
+
+```console
+user@host $ # apt-get install unzip
+user@host $ cd /tmp
+user@host $ wget https://github.com/NVlabs/cub/archive/v1.8.0.zip
+user@host $ unzip v1.8.0.zip -d $HOME/libs
+user@host $ export CUB_INC=$HOME/libs/cub-1.8.0/
+user@host $ rm /tmp/v1.8.0.zip
+```
+
 We provide GPU-tailored CUDA implementations of our novel FlexConv, FlexPool, FlexDeconv, NearestNeighbor operations in TensorFlow, which require a compilation/linking step. To build our operations just use
 
 ```console
