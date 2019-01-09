@@ -42,7 +42,7 @@ positions = tf.convert_to_tensor(positions, name='positions')
 net = [features]
 # use our FlexConv similar to a traditional convolution layer
 
-neighbors = knn_bruteforce(positions, K=5)
+neighbors = knn_bruteforce(positions, k=5)
 net.append(flex_convolution(net[-1],
                             positions,
                             neighbors,
@@ -56,7 +56,7 @@ features = net[-1][:, :, :N // 2]
 positions = positions[:, :, :N // 2]
 net.append(features)
 
-neighbors = knn_bruteforce(positions, K=3)
+neighbors = knn_bruteforce(positions, k=3)
 # we didn't notice any improvements using the transposed version vs. pooling
 net.append(flex_convolution_transpose(net[-1],
                                       positions,
