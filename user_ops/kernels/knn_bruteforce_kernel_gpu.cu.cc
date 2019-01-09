@@ -22,7 +22,6 @@ limitations under the License.
 #include "cuda_utils.h"
 
 #include <cuda.h>
-#include <helper_cuda.h>
 
 #include <cub/cub.cuh>
 
@@ -94,7 +93,6 @@ struct BlockBFKernel {
       typename BlockRadixSort::TempStorage sort;
       typename BlockStoreDists::TempStorage store_dists;
       typename BlockStoreIds::TempStorage store_ids;
-
     } temp_storage;
 
     for (int vpt_i = 0; vpt_i < C_VPT; ++vpt_i) {
@@ -103,9 +101,6 @@ struct BlockBFKernel {
       if (x < N) {
         Dtype sum = 0.f;
         for (int dpi = 0; dpi < Dp; ++dpi) {
-          //					Dtype val = d_data[b * N * Dp + dpi * N +
-          //x]
-          //- d_data[b * N * Dp + dpi * N + y];
           Dtype val = d_data[b * N * Dp + dpi * N + x] - s_point[dpi];
           sum += val * val;
         }
@@ -167,18 +162,12 @@ namespace functor {
 template <typename Dtype, typename NBtype>
 struct KnnBruteforceFunctor<GPUDevice, Dtype, NBtype> {
   void operator()(::tensorflow::OpKernelContext* ctx, const Tensor& positions,
-                  Tensor* neighborhood_out, Tensor* distances,
-                  Tensor* timings) {
-    //		printf("GPU: KNNBF! \n");
-
-    //		printf("return_timings: %d \n",return_timings);
-
+                  Tensor* neighborhood_out, Tensor* distances) {
     const int B = positions.dim_size(0);
     const int D = positions.dim_size(1);
     const int N = positions.dim_size(2);
 
     const int K = neighborhood_out->dim_size(2);
-    //		printf("B: %d | N: %d | K: %d \n", B, N, K);
 
     BlockBFKernelAttributesSetter<Dtype, NBtype> attr;
     attr.d_data = positions.flat<Dtype>().data();
@@ -189,14 +178,6 @@ struct KnnBruteforceFunctor<GPUDevice, Dtype, NBtype> {
     attr.Dp = D;
     attr.K = K;
 
-    cudaEvent_t start, stop;
-    if (return_timings) {
-      cudaEventCreate(&start);
-      cudaEventCreate(&stop);
-      cudaEventRecord(start, 0);
-    }
-
-    // TODO: beautify
     if (N <= 32) {
       BlockBFKernel<Dtype, NBtype, 32, 1> knn;
       attr.setAttributes(knn);
@@ -238,29 +219,12 @@ struct KnnBruteforceFunctor<GPUDevice, Dtype, NBtype> {
           "point sets greater then 8k are note yet supported!! Change to "
           "knn_graph operation!! \n");
     }
-
-    if (return_timings) {
-      float time;
-      cudaEventRecord(stop, 0);
-      cudaEventSynchronize(stop);
-      cudaEventElapsedTime(&time, start, stop);
-      //			printf("complete elapsed time for KNNBf: %f ms
-      //\n", time);
-      Dtype time2 = time;
-
-      cudaMemcpy(timings->flat<Dtype>().data(), &time2, sizeof(Dtype),
-                 cudaMemcpyHostToDevice);
-
-      cudaEventDestroy(start);
-      cudaEventDestroy(stop);
-    }
-
     cudaDeviceSynchronize();
-    getLastCudaError("KNNBF execution failed");
-    checkCudaErrors(cudaDeviceSynchronize());
-  }
 
-  bool return_timings;
+    if (!ctx->eigen_gpu_device().ok()) {
+      ctx->SetStatus(tensorflow::errors::Internal("KNNBF execution failed"));
+    }
+  }
 };
 
 template struct KnnBruteforceFunctor<GPUDevice, float, int>;

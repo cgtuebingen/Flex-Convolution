@@ -24,29 +24,8 @@ Run 3D-MNIST classification using Flex-Convolutions, without any fancy parts.
 Example-output:
 
  python mnist_3d.py --gpu 0 -fusion pooling
-
- [@base.py:282] Epoch 56 (global_step 210000) finished, time:23 minutes 52 seconds.
- [@saver.py:77] Model saved to train_log/conv_position_pooling/model-210000.
- 100%|##############################|625/625[00:55<00:00,11.28it/s]
- [@monitor.py:459] accuracy: 0.94699
- [@monitor.py:459] learning_rate: 0.0001
- [@monitor.py:459] train_error: 0.053013
- [@monitor.py:459] validation_accuracy: 0.9327
- [@monitor.py:459] validation_cross_entropy_loss: 0.209
- [@group.py:48] Callbacks took 55.513 sec in total. InferenceRunner: 55.4 seconds
- [@base.py:272] Start Epoch 57 ...
-
-
  python mnist_3d.py --gpu 0 -fusion conv
 
- [@base.py:282] Epoch 40 (global_step 150000) finished, time:34 minutes 49 seconds.
- [@saver.py:77] Model saved to train_log/conv_position_conv/model-150000.
- 100%|##############################|625/625[00:57<00:00,10.89it/s]
- [@monitor.py:459] accuracy: 0.89019
- [@monitor.py:459] learning_rate: 0.0001
- [@monitor.py:459] train_error: 0.10981
- [@monitor.py:459] validation_accuracy: 0.8748
- [@monitor.py:459] validation_cross_entropy_loss: 0.38396
 
 This implementation is based on Tensorpack
 - http://tensorpack.com/
@@ -155,7 +134,7 @@ class Model(ModelDesc):
     positions = positions / 16. - 1
     # initial features are the position them self
     features = positions
-    neighbors = knn_bruteforce(positions, K=16)
+    neighbors = knn_bruteforce(positions, k=16)
 
     x = features
 
@@ -171,7 +150,7 @@ class Model(ModelDesc):
         x = flex_pooling(x, neighbors)
         x = subsample(x)
         positions = subsample(positions)
-        neighbors = knn_bruteforce(positions, K=16)
+        neighbors = knn_bruteforce(positions, k=16)
 
       x = flex_convolution(x, positions, neighbors, 64 *
                            (stage + 1), activation=tf.nn.relu)
@@ -187,7 +166,7 @@ class Model(ModelDesc):
       positions = tf.concat([positions, positions[:, :, :1] * 0], axis=-1)
       x = tf.concat([x, x[:, :, :1] * 0], axis=-1)
       K = positions.shape.as_list()[-1]
-      neighbors = knn_bruteforce(positions, K=K)
+      neighbors = knn_bruteforce(positions, k=K)
       x = flex_convolution(x, positions, neighbors, 1024, activation=tf.nn.relu)
       x = x[:, :, -1:]
 

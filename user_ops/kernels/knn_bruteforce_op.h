@@ -33,7 +33,7 @@ namespace functor {
 template <typename Device, typename Dtype, typename NBtype>
 struct KnnBruteforceFunctor {
   void operator()(::tensorflow::OpKernelContext *ctx, const Tensor &positions,
-                  Tensor *neighborhood_out, Tensor *distances, Tensor *timings);
+                  Tensor *neighborhood_out, Tensor *distances);
 
   bool return_timings;
 };

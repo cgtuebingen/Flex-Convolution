@@ -60,19 +60,19 @@ class KnnBruteforce(Layer):
   """
 
   def __init__(self,
-               K,
+               k,
                data_format='simple',
                name=None):
 
     super(KnnBruteforce, self).__init__(name=name)
-    assert K > 0
+    assert k > 0
     assert data_format in ['simple', 'expanded']
-    self.K = K
+    self.k = k
     self.data_format = data_format
 
   def compute_output_shape(self, input_shapes):
     output_shape = input_shapes[0]
-    output_shape[1] = self.K
+    output_shape[1] = self.k
     return output_shape
 
   def call(self, inputs):
@@ -81,7 +81,7 @@ class KnnBruteforce(Layer):
     if self.data_format == 'expanded':
       positions = _remove_dim(positions, 2)
 
-    NN, _, _ = _knn_bruteforce(positions, K=self.K)
+    NN, _ = _knn_bruteforce(positions, k=self.k)
     NN = tf.transpose(NN, [0, 2, 1])
 
     if self.data_format == 'expanded':
@@ -91,11 +91,11 @@ class KnnBruteforce(Layer):
 
 
 def knn_bruteforce(positions,
-                   K,
+                   k,
                    data_format='simple',
                    name=None):
 
-  layer = KnnBruteforce(K, data_format=data_format, name=name)
+  layer = KnnBruteforce(k, data_format=data_format, name=name)
 
   return layer.apply(positions)
 

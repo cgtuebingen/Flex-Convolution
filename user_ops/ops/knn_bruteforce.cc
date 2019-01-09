@@ -14,9 +14,7 @@ REGISTER_OP("KnnBruteforce")
                                          // neighbors        [B, N, K].
     .Output("distances: T")              // distances: 	 all K nearest distances
                                          // [B, N, K].
-    .Output("timings: T")                // timings:
-                                         // [1]
-    .Attr("K: int")
+    .Attr("k: int")
     .Attr("return_timings: bool = false")
     .Attr("T: realnumbertype")
     .Attr("NBtype: {int32} = DT_INT32")

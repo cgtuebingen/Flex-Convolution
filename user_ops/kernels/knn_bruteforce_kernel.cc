@@ -24,8 +24,7 @@ namespace functor {
 template <typename Dtype, typename NBtype>
 struct KnnBruteforceFunctor<CPUDevice, Dtype, NBtype> {
   void operator()(::tensorflow::OpKernelContext* ctx, const Tensor& positions_,
-                  Tensor* neighborhood_out_, Tensor* distances_,
-                  Tensor* timings) {
+                  Tensor* neighborhood_out_, Tensor* distances_) {
     // positions [B, Dp, N]
     // neighborhood_out_ [B, N, K]
     // distances_ [B, N, K]

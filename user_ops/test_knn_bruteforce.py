@@ -29,14 +29,14 @@ case = FakePointCloud(B=2, N=32, K=4, Din=2, Dout=6, Dp=3)
 case = FakePointCloud(B=1, N=4, K=2, Din=1, Dout=1, Dp=3)
 
 
-def python_bruteforce(positions, K):
+def python_bruteforce(positions, k):
   # B, Dpos, N
   all_neighbors = []
   all_distances = []
   for batch in positions:
     distances = squareform(pdist(batch.T, 'euclidean'))
-    all_neighbors.append(np.argsort(distances, axis=1)[:, :K])
-    all_distances.append(np.sort(distances, axis=1)[:, :K])
+    all_neighbors.append(np.argsort(distances, axis=1)[:, :k])
+    all_distances.append(np.sort(distances, axis=1)[:, :k])
   return np.array(all_neighbors), np.array(all_distances)
 
 
@@ -46,10 +46,10 @@ class KnnBruteforceTest(VerboseTestCase):
 
   def _forward(self, use_gpu=False):
     case.init_ops()
-    expected_nn, expected_dist = python_bruteforce(case.position, K=4)
+    expected_nn, expected_dist = python_bruteforce(case.position, k=4)
 
     with self.test_session(use_gpu=use_gpu, force_gpu=use_gpu) as sess:
-      actual_nn, actual_dist, _ = knn_bruteforce(case.position_op, K=4)
+      actual_nn, actual_dist = knn_bruteforce(case.position_op, k=4)
       actual_nn, actual_dist = sess.run([actual_nn, actual_dist])
 
     self.assertAllClose(expected_dist, actual_dist)

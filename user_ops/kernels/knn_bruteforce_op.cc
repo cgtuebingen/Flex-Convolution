@@ -30,8 +30,7 @@ template <typename Device, typename Dtype>
 class KnnBruteforceOp : public OpKernel {
  public:
   explicit KnnBruteforceOp(OpKernelConstruction* ctx) : OpKernel(ctx) {
-    OP_REQUIRES_OK(ctx, ctx->GetAttr("K", &K));
-    OP_REQUIRES_OK(ctx, ctx->GetAttr("return_timings", &return_timings));
+    OP_REQUIRES_OK(ctx, ctx->GetAttr("k", &K));
   }
 
   void Compute(OpKernelContext* ctx) override {
@@ -43,7 +42,6 @@ class KnnBruteforceOp : public OpKernel {
 
     Tensor* neighborhood_out = nullptr;
     Tensor* distances = nullptr;
-    Tensor* timings = nullptr;
 
     OP_REQUIRES_OK(ctx, ctx->allocate_output(0, TensorShape({B, N, K}),
                                              &neighborhood_out));
@@ -51,19 +49,14 @@ class KnnBruteforceOp : public OpKernel {
     OP_REQUIRES_OK(ctx,
                    ctx->allocate_output(1, TensorShape({B, N, K}), &distances));
 
-    OP_REQUIRES_OK(ctx, ctx->allocate_output(2, TensorShape({1}), &timings));
-
     ::tensorflow::functor::KnnBruteforceFunctor<Device, Dtype, int> knnBFF;
-    knnBFF.return_timings = return_timings;
-    knnBFF(ctx, positions, neighborhood_out, distances, timings);
+    knnBFF(ctx, positions, neighborhood_out, distances);
   }
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(KnnBruteforceOp);
 
   int K;
-  bool return_timings;
-  //	int subBatch;
 };
 
 #define REGISTER_CUSTOM_OP(NAME, DEVICE, T)                       \
