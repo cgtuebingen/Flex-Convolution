@@ -23,7 +23,7 @@ REGISTER_OP("KnnBruteforce")
       const auto neighborhood_out = c->input(1);
 
       int K;
-      c->GetAttr("K", &K);
+      c->GetAttr("k", &K);
 
       auto B = c->Dim(position, 0);
       auto N = c->Dim(position, 2);
