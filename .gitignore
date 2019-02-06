@@ -136,3 +136,5 @@ tensorflow_config.txt
 local/
 
 train_log/
+
+knn_graph*.*
