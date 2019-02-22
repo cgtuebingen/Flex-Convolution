@@ -7,4 +7,5 @@ __device__ T* DynamicSharedMemory() {
   return reinterpret_cast<T*>(s_shm);
 }
 
+
 #endif  // LIB_CUDA_UTILS_H_

@@ -25,42 +25,8 @@ limitations under the License.
 #include "tensorflow/core/util/cuda_kernel_helper.h"
 
 namespace {
-inline int up2(int len, int th) { return (len - 1) / th + 1; }
 
-template <typename Dtype>
-__global__ void forward(const int B, const int N, const int K, const int D,
-                        const Dtype* features, const int* neighborhood,
-                        Dtype* output, int* argmax, Dtype float_min_value) {
-  // features: each feature description for each point [B, D, N].
-  // neighborhood: all K nearest neighbors [B, K, N].
-  // output: each feature description for each point [B, D, N].
-  // argmax: global id in neighborhood who was winning the pooling [B, D, N].
-  const int b = blockIdx.z;
-
-  for (int d = blockIdx.y * blockDim.y + threadIdx.y; d < D;
-       d += blockDim.y * gridDim.y) {
-    for (int n = blockIdx.x * blockDim.x + threadIdx.x; n < N;
-         n += blockDim.x * gridDim.x) {
-      Dtype best_value = float_min_value;
-      int best_id = 0;
-
-      const int current_flat = b * D * N + d * N + n;
-
-      for (int k_ = 0; k_ < K; ++k_) {
-        const int other_global_id = neighborhood[b * K * N + k_ * N + n];
-        const Dtype v = features[b * D * N + d * N + other_global_id];
-
-        if (best_value < v) {
-          best_id = other_global_id;
-          best_value = v;
-        }
-      }
-
-      output[current_flat] = best_value;
-      argmax[current_flat] = best_id;
-    }
-  }
-}
+#include "flex_pool_kernel_gpu_impl.cuh"
 
 template <typename Dtype>
 __global__ void backward(const int B, const int N, const int K, const int D,
