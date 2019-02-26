@@ -1,3 +1,4 @@
+---
 kind: pipeline
 name: default
 
@@ -14,3 +15,8 @@ steps:
   - cmake . -DPYTHON_EXECUTABLE=python2
   - make
 
+---
+kind: signature
+hmac: 9ce522c14260911196686ee21b17b9e86f3b697101317e476753d5dd1c678990
+
+...
