@@ -1,11 +1,16 @@
-pipeline:
-  custom_op:
-    image: tensorflow:ubuntu16.04-cuda9.2-bazel0.16.1-tensorflow1.10.0
-    environment:
-      - CUB_INC=/extra/cub-1.8.0/
-    commands:
-      - git clone --single-branch --depth 1 https://github.com/NVIDIA/cuda-samples.git /extra/samples
-      - export LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs:$${LD_LIBRARY_PATH}
-      - cd user_ops
-      - cmake . -DPYTHON_EXECUTABLE=python2
-      - make
+kind: pipeline
+name: default
+
+steps:
+- name: custom-op
+  image: tensorflow:ubuntu16.04-cuda9.2-bazel0.16.1-tensorflow1.10.0
+  pull: never
+  environment:
+    CUB_INC: /extra/cub-1.8.0/
+  commands:
+  - git clone --single-branch --depth 1 https://github.com/NVIDIA/cuda-samples.git /extra/samples
+  - export LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs:$${LD_LIBRARY_PATH}
+  - cd user_ops
+  - cmake . -DPYTHON_EXECUTABLE=python2
+  - make
+
