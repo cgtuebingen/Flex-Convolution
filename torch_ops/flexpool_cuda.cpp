@@ -23,6 +23,11 @@ limitations under the License.
 std::vector<at::Tensor> flexpool_cuda_forward(at::Tensor features,
                                               at::Tensor neighborhood);
 
+std::vector<at::Tensor> flexpool_cuda_backward(at::Tensor features,
+                                               at::Tensor neighborhood,
+                                               at::Tensor topdiff,
+                                               at::Tensor argmax);
+
 // C++ interface
 
 // NOTE: AT_ASSERT has become AT_CHECK on master after 0.4.
@@ -42,8 +47,21 @@ std::vector<at::Tensor> flexpool_forward(at::Tensor features,
   return flexpool_cuda_forward(features, neighborhood);
 }
 
+std::vector<at::Tensor> flexpool_backward(at::Tensor features,
+                                          at::Tensor neighborhood,
+                                          at::Tensor topdiff,
+                                          at::Tensor argmax) {
+  CHECK_INPUT(features);
+  CHECK_INPUT(neighborhood);
+  CHECK_INPUT(topdiff);
+  CHECK_INPUT(argmax);
+
+  return flexpool_cuda_backward(features, neighborhood, topdiff, argmax);
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("forward", &flexpool_forward, "FlexPool forward (CUDA)");
+  m.def("backward", &flexpool_forward, "FlexPool backward (CUDA)");
 }
 
 #undef CHECK_CUDA

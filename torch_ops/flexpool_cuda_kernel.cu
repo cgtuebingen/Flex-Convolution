@@ -52,3 +52,30 @@ std::vector<at::Tensor> flexpool_cuda_forward(at::Tensor features,
 
   return {output, argmax};
 }
+
+std::vector<at::Tensor> flexpool_cuda_backward(at::Tensor features,
+                                               at::Tensor neighborhood,
+                                               at::Tensor topdiff,
+                                               at::Tensor argmax) {
+  const int B = features.size(0);
+  const int D = features.size(1);
+  const int N = features.size(2);
+
+  const int K = neighborhood.size(1);
+
+  auto bottom_diff = at::zeros({B, D, N}, features.type());
+
+  const int threads = 32;
+  dim3 block(threads, threads, 1);
+  dim3 grid(up2(N, threads), up2(D, threads), B);
+
+  AT_DISPATCH_FLOATING_TYPES(features.type(), "flexpool_backward_cuda", ([&] {
+                               backward<scalar_t><<<grid, block>>>(
+                                   B, N, K, D, features.data<scalar_t>(),
+                                   neighborhood.data<int>(),
+                                   topdiff.data<scalar_t>(), argmax.data<int>(),
+                                   bottom_diff.data<scalar_t>());
+                             }));
+
+  return {bottom_diff};
+}

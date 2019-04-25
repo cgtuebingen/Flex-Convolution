@@ -54,4 +54,33 @@ __global__ void forward(const int B, const int N, const int K, const int D,
   }
 }
 
+template <typename Dtype>
+__global__ void backward(const int B, const int N, const int K, const int D,
+
+                         const Dtype* features, const int* neighborhood,
+                         const Dtype* topdiff, const int* argmax,
+
+                         Dtype* grad_features) {
+  // features: each feature description for each point [B, D, N].
+  // neighborhood: all K nearest neighbors [B, K, N].
+  // gradients: topdiff[B, D, N].
+  // argmax: argmax[B, D, N].
+  // grad_features: gradient to each feature description for each point [B, D,
+  // N].
+  const int b = blockIdx.z;
+
+  for (int d = blockIdx.y * blockDim.y + threadIdx.y; d < D;
+       d += blockDim.y * gridDim.y) {
+    for (int n = blockIdx.x * blockDim.x + threadIdx.x; n < N;
+         n += blockDim.x * gridDim.x) {
+      const int top_id_flat = b * D * N + d * N + n;
+      const int argmax_id = argmax[top_id_flat];
+      const int bottom_id_flat = b * D * N + d * N + argmax_id;
+
+      // TODO(patwie): scattered write, yeah :-(
+      atomicAdd(&grad_features[bottom_id_flat], topdiff[top_id_flat]);
+    }
+  }
+}
+
 #endif  // LIB_FLEX_POOL_KERNEL_GPU_IMPL_H_
